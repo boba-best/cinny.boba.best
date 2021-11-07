@@ -1,5 +1,5 @@
 {
-  "defaultHomeserver": 5,
+  "defaultHomeserver": 0,
   "homeserverList": [
     "boba.best",
     "converser.eu",
