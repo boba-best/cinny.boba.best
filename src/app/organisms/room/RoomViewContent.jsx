@@ -8,7 +8,7 @@ import dateFormat from 'dateformat';
 import initMatrix from '../../../client/initMatrix';
 import cons from '../../../client/state/cons';
 import { redactEvent, sendReaction } from '../../../client/action/roomTimeline';
-import { getUsername, getUsernameOfRoomMember, doesRoomHaveUnread } from '../../../util/matrixUtil';
+import { getUsername, getUsernameOfRoomMember } from '../../../util/matrixUtil';
 import colorMXID from '../../../util/colorMXID';
 import { diffMinutes, isNotInSameDay, getEventCords } from '../../../util/common';
 import { openEmojiBoard, openProfileViewer, openReadReceipts } from '../../../client/action/navigation';
@@ -191,6 +191,7 @@ function RoomViewContent({
   const [onPagination, setOnPagination] = useState(null);
   const [editEvent, setEditEvent] = useState(null);
   const mx = initMatrix.matrixClient;
+  const noti = initMatrix.notifications;
 
   function autoLoadTimeline() {
     if (timelineScroll.isScrollable() === true) return;
@@ -199,7 +200,7 @@ function RoomViewContent({
   function trySendingReadReceipt() {
     const { room, timeline } = roomTimeline;
     if (
-      (doesRoomHaveUnread(room) || initMatrix.notifications.hasNoti(roomId))
+      (noti.doesRoomHaveUnread(room) || noti.hasNoti(roomId))
       && timeline.length !== 0) {
       mx.sendReadReceipt(timeline[timeline.length - 1]);
     }
@@ -282,6 +283,7 @@ function RoomViewContent({
 
     let content = mEvent.getContent().body;
     if (typeof content === 'undefined') return null;
+    const msgType = mEvent.getContent()?.msgtype;
     let reply = null;
     let reactions = null;
     let isMarkdown = mEvent.getContent().format === 'org.matrix.custom.html';
@@ -356,7 +358,7 @@ function RoomViewContent({
       <button type="button" onClick={() => openProfileViewer(mEvent.sender.userId, roomId)}>
         <Avatar
           imageSrc={mEvent.sender.getAvatarUrl(initMatrix.matrixClient.baseUrl, 36, 36, 'crop')}
-          text={getUsernameOfRoomMember(mEvent.sender).slice(0, 1)}
+          text={getUsernameOfRoomMember(mEvent.sender)}
           bgColor={senderMXIDColor}
           size="small"
         />
@@ -379,8 +381,10 @@ function RoomViewContent({
     );
     const userContent = (
       <MessageContent
+        senderName={getUsernameOfRoomMember(mEvent.sender)}
         isMarkdown={isMarkdown}
         content={isMedia(mEvent) ? genMediaContent(mEvent) : content}
+        msgType={msgType}
         isEdited={isEdited}
       />
     );
@@ -496,6 +500,7 @@ function RoomViewContent({
         header={userHeader}
         reply={userReply}
         content={editEvent !== null && isEditingEvent ? null : userContent}
+        msgType={msgType}
         editContent={editEvent !== null && isEditingEvent ? (
           <MessageEdit
             content={content}
