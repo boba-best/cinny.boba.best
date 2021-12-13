@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './RoomOptions.scss';
 
+import { twemojify } from '../../../util/twemojify';
+
 import initMatrix from '../../../client/initMatrix';
 import cons from '../../../client/state/cons';
 import navigation from '../../../client/state/navigation';
@@ -9,6 +11,7 @@ import * as roomActions from '../../../client/action/room';
 
 import ContextMenu, { MenuHeader, MenuItem } from '../../atoms/context-menu/ContextMenu';
 
+import TickMarkIC from '../../../../public/res/ic/outlined/tick-mark.svg';
 import BellIC from '../../../../public/res/ic/outlined/bell.svg';
 import BellRingIC from '../../../../public/res/ic/outlined/bell-ring.svg';
 import BellPingIC from '../../../../public/res/ic/outlined/bell-ping.svg';
@@ -146,9 +149,20 @@ function RoomOptions() {
     };
   }, []);
 
+  const handleMarkAsRead = () => {
+    const mx = initMatrix.matrixClient;
+    const room = mx.getRoom(roomId);
+    if (!room) return;
+    const events = room.getLiveTimeline().getEvents();
+    mx.sendReadReceipt(events[events.length - 1]);
+  };
+
   const handleInviteClick = () => openInviteUser(roomId);
-  const handleLeaveClick = () => {
-    if (confirm('Are you really want to leave this room?')) roomActions.leave(roomId);
+  const handleLeaveClick = (toggleMenu) => {
+    if (confirm('Are you really want to leave this room?')) {
+      roomActions.leave(roomId);
+      toggleMenu();
+    }
   };
 
   function setNotif(nState, currentNState) {
@@ -163,7 +177,15 @@ function RoomOptions() {
       maxWidth={298}
       content={(toggleMenu) => (
         <>
-          <MenuHeader>{`Options for ${initMatrix.matrixClient.getRoom(roomId)?.name}`}</MenuHeader>
+          <MenuHeader>{twemojify(`Options for ${initMatrix.matrixClient.getRoom(roomId)?.name}`)}</MenuHeader>
+          <MenuItem
+            iconSrc={TickMarkIC}
+            onClick={() => {
+              handleMarkAsRead(); toggleMenu();
+            }}
+          >
+            Mark as read
+          </MenuItem>
           <MenuItem
             iconSrc={AddUserIC}
             onClick={() => {
@@ -172,7 +194,7 @@ function RoomOptions() {
           >
             Invite
           </MenuItem>
-          <MenuItem iconSrc={LeaveArrowIC} variant="danger" onClick={handleLeaveClick}>Leave</MenuItem>
+          <MenuItem iconSrc={LeaveArrowIC} variant="danger" onClick={() => handleLeaveClick(toggleMenu)}>Leave</MenuItem>
           <MenuHeader>Notification</MenuHeader>
           <MenuItem
             variant={notifState === cons.notifs.DEFAULT ? 'positive' : 'surface'}

@@ -10,9 +10,10 @@ import LeaveArraowIC from '../../../../public/res/ic/outlined/leave-arrow.svg';
 import InviteArraowIC from '../../../../public/res/ic/outlined/invite-arrow.svg';
 import InviteCancelArraowIC from '../../../../public/res/ic/outlined/invite-cancel-arrow.svg';
 import UserIC from '../../../../public/res/ic/outlined/user.svg';
-import TickMarkIC from '../../../../public/res/ic/outlined/tick-mark.svg';
 
-function TimelineChange({ variant, content, time, onClick }) {
+function TimelineChange({
+  variant, content, time, onClick,
+}) {
   let iconSrc;
 
   switch (variant) {
@@ -31,9 +32,6 @@ function TimelineChange({ variant, content, time, onClick }) {
     case 'avatar':
       iconSrc = UserIC;
       break;
-    case 'follow':
-      iconSrc = TickMarkIC;
-      break;
     default:
       iconSrc = JoinArraowIC;
       break;
@@ -47,7 +45,6 @@ function TimelineChange({ variant, content, time, onClick }) {
       <div className="timeline-change__content">
         <Text variant="b2">
           {content}
-          {/* <Linkify options={{ target: { url: '_blank' } }}>{content}</Linkify> */}
         </Text>
       </div>
       <div className="timeline-change__time">
@@ -66,7 +63,6 @@ TimelineChange.propTypes = {
   variant: PropTypes.oneOf([
     'join', 'leave', 'invite',
     'invite-cancel', 'avatar', 'other',
-    'follow',
   ]),
   content: PropTypes.oneOfType([
     PropTypes.string,

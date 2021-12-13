@@ -11,7 +11,9 @@ class Navigation extends EventEmitter {
     this.selectedSpacePath = [cons.tabs.HOME];
 
     this.selectedRoomId = null;
-    this.isPeopleDrawerVisible = true;
+    this.recentRooms = [];
+
+    this.isRawModalVisible = false;
   }
 
   _setSpacePath(roomId) {
@@ -25,6 +27,27 @@ class Navigation extends EventEmitter {
       return;
     }
     this.selectedSpacePath.push(roomId);
+  }
+
+  removeRecentRoom(roomId) {
+    if (typeof roomId !== 'string') return;
+    const roomIdIndex = this.recentRooms.indexOf(roomId);
+    if (roomIdIndex >= 0) {
+      this.recentRooms.splice(roomIdIndex, 1);
+    }
+  }
+
+  addRecentRoom(roomId) {
+    if (typeof roomId !== 'string') return;
+
+    this.recentRooms.push(roomId);
+    if (this.recentRooms.length > 10) {
+      this.recentRooms.splice(0, 1);
+    }
+  }
+
+  setIsRawModalVisible(visible) {
+    this.isRawModalVisible = visible;
   }
 
   navigate(action) {
@@ -51,11 +74,15 @@ class Navigation extends EventEmitter {
       [cons.actions.navigation.SELECT_ROOM]: () => {
         const prevSelectedRoomId = this.selectedRoomId;
         this.selectedRoomId = action.roomId;
-        this.emit(cons.events.navigation.ROOM_SELECTED, this.selectedRoomId, prevSelectedRoomId);
-      },
-      [cons.actions.navigation.TOGGLE_PEOPLE_DRAWER]: () => {
-        this.isPeopleDrawerVisible = !this.isPeopleDrawerVisible;
-        this.emit(cons.events.navigation.PEOPLE_DRAWER_TOGGLED, this.isPeopleDrawerVisible);
+        this.removeRecentRoom(prevSelectedRoomId);
+        this.addRecentRoom(prevSelectedRoomId);
+        this.removeRecentRoom(this.selectedRoomId);
+        this.emit(
+          cons.events.navigation.ROOM_SELECTED,
+          this.selectedRoomId,
+          prevSelectedRoomId,
+          action.eventId,
+        );
       },
       [cons.actions.navigation.OPEN_INVITE_LIST]: () => {
         this.emit(cons.events.navigation.INVITE_LIST_OPENED);
@@ -85,7 +112,7 @@ class Navigation extends EventEmitter {
         this.emit(
           cons.events.navigation.READRECEIPTS_OPENED,
           action.roomId,
-          action.eventId,
+          action.userIds,
         );
       },
       [cons.actions.navigation.OPEN_ROOMOPTIONS]: () => {
@@ -93,6 +120,20 @@ class Navigation extends EventEmitter {
           cons.events.navigation.ROOMOPTIONS_OPENED,
           action.cords,
           action.roomId,
+        );
+      },
+      [cons.actions.navigation.CLICK_REPLY_TO]: () => {
+        this.emit(
+          cons.events.navigation.REPLY_TO_CLICKED,
+          action.userId,
+          action.eventId,
+          action.body,
+        );
+      },
+      [cons.actions.navigation.OPEN_SEARCH]: () => {
+        this.emit(
+          cons.events.navigation.SEARCH_OPENED,
+          action.term,
         );
       },
     };

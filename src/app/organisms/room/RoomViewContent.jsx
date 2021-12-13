@@ -1,134 +1,57 @@
+/* eslint-disable jsx-a11y/no-static-element-interactions */
+/* eslint-disable jsx-a11y/click-events-have-key-events */
 /* eslint-disable react/prop-types */
-import React, { useState, useEffect, useLayoutEffect } from 'react';
+import React, {
+  useState, useEffect, useLayoutEffect, useCallback, useRef,
+} from 'react';
 import PropTypes from 'prop-types';
 import './RoomViewContent.scss';
 
+import EventEmitter from 'events';
 import dateFormat from 'dateformat';
 
 import initMatrix from '../../../client/initMatrix';
 import cons from '../../../client/state/cons';
-import { redactEvent, sendReaction } from '../../../client/action/roomTimeline';
-import { getUsername, getUsernameOfRoomMember } from '../../../util/matrixUtil';
-import colorMXID from '../../../util/colorMXID';
-import { diffMinutes, isNotInSameDay, getEventCords } from '../../../util/common';
-import { openEmojiBoard, openProfileViewer, openReadReceipts } from '../../../client/action/navigation';
+import navigation from '../../../client/state/navigation';
+import { openProfileViewer } from '../../../client/action/navigation';
+import {
+  diffMinutes, isInSameDay, Throttle, getScrollInfo,
+} from '../../../util/common';
 
 import Divider from '../../atoms/divider/Divider';
-import Avatar from '../../atoms/avatar/Avatar';
-import IconButton from '../../atoms/button/IconButton';
-import ContextMenu, { MenuHeader, MenuItem, MenuBorder } from '../../atoms/context-menu/ContextMenu';
-import {
-  Message,
-  MessageHeader,
-  MessageReply,
-  MessageContent,
-  MessageEdit,
-  MessageReactionGroup,
-  MessageReaction,
-  MessageOptions,
-  PlaceholderMessage,
-} from '../../molecules/message/Message';
-import * as Media from '../../molecules/media/Media';
+import ScrollView from '../../atoms/scroll/ScrollView';
+import { Message, PlaceholderMessage } from '../../molecules/message/Message';
 import RoomIntro from '../../molecules/room-intro/RoomIntro';
 import TimelineChange from '../../molecules/message/TimelineChange';
 
-import ReplyArrowIC from '../../../../public/res/ic/outlined/reply-arrow.svg';
-import EmojiAddIC from '../../../../public/res/ic/outlined/emoji-add.svg';
-import VerticalMenuIC from '../../../../public/res/ic/outlined/vertical-menu.svg';
-import PencilIC from '../../../../public/res/ic/outlined/pencil.svg';
-import TickMarkIC from '../../../../public/res/ic/outlined/tick-mark.svg';
-import BinIC from '../../../../public/res/ic/outlined/bin.svg';
+import { useStore } from '../../hooks/useStore';
+import { useForceUpdate } from '../../hooks/useForceUpdate';
+import { parseTimelineChange } from './common';
 
-import { parseReply, parseTimelineChange } from './common';
-
+const DEFAULT_MAX_EVENTS = 50;
+const PAG_LIMIT = 30;
 const MAX_MSG_DIFF_MINUTES = 5;
+const PLACEHOLDER_COUNT = 2;
+const PLACEHOLDERS_HEIGHT = 96 * PLACEHOLDER_COUNT;
+const SCROLL_TRIGGER_POS = PLACEHOLDERS_HEIGHT * 4;
 
-function genPlaceholders() {
+const SMALLEST_MSG_HEIGHT = 32;
+const PAGES_COUNT = 4;
+
+function loadingMsgPlaceholders(key, count = 2) {
+  const pl = [];
+  const genPlaceholders = () => {
+    for (let i = 0; i < count; i += 1) {
+      pl.push(<PlaceholderMessage key={`placeholder-${i}${key}`} />);
+    }
+    return pl;
+  };
+
   return (
-    <>
-      <PlaceholderMessage key="placeholder-1" />
-      <PlaceholderMessage key="placeholder-2" />
-      <PlaceholderMessage key="placeholder-3" />
-    </>
+    <React.Fragment key={`placeholder-container${key}`}>
+      {genPlaceholders()}
+    </React.Fragment>
   );
-}
-
-function isMedia(mE) {
-  return (
-    mE.getContent()?.msgtype === 'm.file'
-    || mE.getContent()?.msgtype === 'm.image'
-    || mE.getContent()?.msgtype === 'm.audio'
-    || mE.getContent()?.msgtype === 'm.video'
-    || mE.getType() === 'm.sticker'
-  );
-}
-
-function genMediaContent(mE) {
-  const mx = initMatrix.matrixClient;
-  const mContent = mE.getContent();
-  if (!mContent || !mContent.body) return <span style={{ color: 'var(--bg-danger)' }}>Malformed event</span>;
-
-  let mediaMXC = mContent?.url;
-  const isEncryptedFile = typeof mediaMXC === 'undefined';
-  if (isEncryptedFile) mediaMXC = mContent?.file?.url;
-
-  let thumbnailMXC = mContent?.info?.thumbnail_url;
-
-  if (typeof mediaMXC === 'undefined' || mediaMXC === '') return <span style={{ color: 'var(--bg-danger)' }}>Malformed event</span>;
-
-  let msgType = mE.getContent()?.msgtype;
-  if (mE.getType() === 'm.sticker') msgType = 'm.image';
-
-  switch (msgType) {
-    case 'm.file':
-      return (
-        <Media.File
-          name={mContent.body}
-          link={mx.mxcUrlToHttp(mediaMXC)}
-          type={mContent.info?.mimetype}
-          file={mContent.file || null}
-        />
-      );
-    case 'm.image':
-      return (
-        <Media.Image
-          name={mContent.body}
-          width={typeof mContent.info?.w === 'number' ? mContent.info?.w : null}
-          height={typeof mContent.info?.h === 'number' ? mContent.info?.h : null}
-          link={mx.mxcUrlToHttp(mediaMXC)}
-          file={isEncryptedFile ? mContent.file : null}
-          type={mContent.info?.mimetype}
-        />
-      );
-    case 'm.audio':
-      return (
-        <Media.Audio
-          name={mContent.body}
-          link={mx.mxcUrlToHttp(mediaMXC)}
-          type={mContent.info?.mimetype}
-          file={mContent.file || null}
-        />
-      );
-    case 'm.video':
-      if (typeof thumbnailMXC === 'undefined') {
-        thumbnailMXC = mContent.info?.thumbnail_file?.url || null;
-      }
-      return (
-        <Media.Video
-          name={mContent.body}
-          link={mx.mxcUrlToHttp(mediaMXC)}
-          thumbnail={thumbnailMXC === null ? null : mx.mxcUrlToHttp(thumbnailMXC)}
-          thumbnailFile={isEncryptedFile ? mContent.info?.thumbnail_file : null}
-          thumbnailType={mContent.info?.thumbnail_info?.mimetype || null}
-          width={typeof mContent.info?.w === 'number' ? mContent.info?.w : null}
-          height={typeof mContent.info?.h === 'number' ? mContent.info?.h : null}
-          file={isEncryptedFile ? mContent.file : null}
-          type={mContent.info?.mimetype}
-        />
-      );
-    default:
-      return <span style={{ color: 'var(--bg-danger)' }}>Malformed event</span>;
-  }
 }
 
 function genRoomIntro(mEvent, roomTimeline) {
@@ -150,436 +73,586 @@ function genRoomIntro(mEvent, roomTimeline) {
   );
 }
 
-function getMyEmojiEventId(emojiKey, eventId, roomTimeline) {
-  const mx = initMatrix.matrixClient;
-  const rEvents = roomTimeline.reactionTimeline.get(eventId);
-  let rEventId = null;
-  rEvents?.find((rE) => {
-    if (rE.getRelation() === null) return false;
-    if (rE.getRelation().key === emojiKey && rE.getSender() === mx.getUserId()) {
-      rEventId = rE.getId();
-      return true;
-    }
-    return false;
-  });
-  return rEventId;
+function handleOnClickCapture(e) {
+  const { target, nativeEvent } = e;
+
+  const userId = target.getAttribute('data-mx-pill');
+  if (userId) {
+    const roomId = navigation.selectedRoomId;
+    openProfileViewer(userId, roomId);
+  }
+
+  const spoiler = nativeEvent.path.find((el) => el?.hasAttribute?.('data-mx-spoiler'));
+  if (spoiler) {
+    spoiler.classList.toggle('data-mx-spoiler--visible');
+  }
 }
 
-function toggleEmoji(roomId, eventId, emojiKey, roomTimeline) {
-  const myAlreadyReactEventId = getMyEmojiEventId(emojiKey, eventId, roomTimeline);
-  if (typeof myAlreadyReactEventId === 'string') {
-    if (myAlreadyReactEventId.indexOf('~') === 0) return;
-    redactEvent(roomId, myAlreadyReactEventId);
-    return;
-  }
-  sendReaction(roomId, eventId, emojiKey);
-}
+function renderEvent(roomTimeline, mEvent, prevMEvent, isFocus = false) {
+  const isBodyOnly = (prevMEvent !== null
+    && prevMEvent.getType() !== 'm.room.member'
+    && prevMEvent.getType() !== 'm.room.create'
+    && diffMinutes(mEvent.getDate(), prevMEvent.getDate()) <= MAX_MSG_DIFF_MINUTES
+    && prevMEvent.getSender() === mEvent.getSender()
+  );
+  const mDate = mEvent.getDate();
+  const isToday = isInSameDay(mDate, new Date());
 
-function pickEmoji(e, roomId, eventId, roomTimeline) {
-  openEmojiBoard(getEventCords(e), (emoji) => {
-    toggleEmoji(roomId, eventId, emoji.unicode, roomTimeline);
-    e.target.click();
-  });
-}
+  const time = dateFormat(mDate, isToday ? 'hh:MM TT' : 'dd/mm/yyyy');
 
-let wasAtBottom = true;
-function RoomViewContent({
-  roomId, roomTimeline, timelineScroll, viewEvent,
-}) {
-  const [isReachedTimelineEnd, setIsReachedTimelineEnd] = useState(false);
-  const [onStateUpdate, updateState] = useState(null);
-  const [onPagination, setOnPagination] = useState(null);
-  const [editEvent, setEditEvent] = useState(null);
-  const mx = initMatrix.matrixClient;
-  const noti = initMatrix.notifications;
-
-  function autoLoadTimeline() {
-    if (timelineScroll.isScrollable() === true) return;
-    roomTimeline.paginateBack();
-  }
-  function trySendingReadReceipt() {
-    const { room, timeline } = roomTimeline;
-    if (
-      (noti.doesRoomHaveUnread(room) || noti.hasNoti(roomId))
-      && timeline.length !== 0) {
-      mx.sendReadReceipt(timeline[timeline.length - 1]);
-    }
-  }
-
-  function onReachedTop() {
-    if (roomTimeline.isOngoingPagination || isReachedTimelineEnd) return;
-    roomTimeline.paginateBack();
-  }
-  function toggleOnReachedBottom(isBottom) {
-    wasAtBottom = isBottom;
-    if (!isBottom) return;
-    trySendingReadReceipt();
-  }
-
-  const updatePAG = (canPagMore) => {
-    if (!canPagMore) {
-      setIsReachedTimelineEnd(true);
-    } else {
-      setOnPagination({});
-      autoLoadTimeline();
-    }
-  };
-  // force update RoomTimeline on cons.events.roomTimeline.EVENT
-  const updateRT = () => {
-    if (wasAtBottom) {
-      trySendingReadReceipt();
-    }
-    updateState({});
-  };
-
-  useEffect(() => {
-    setIsReachedTimelineEnd(false);
-    wasAtBottom = true;
-  }, [roomId]);
-  useEffect(() => trySendingReadReceipt(), [roomTimeline]);
-
-  // init room setup completed.
-  // listen for future. setup stateUpdate listener.
-  useEffect(() => {
-    roomTimeline.on(cons.events.roomTimeline.EVENT, updateRT);
-    roomTimeline.on(cons.events.roomTimeline.PAGINATED, updatePAG);
-    viewEvent.on('reached-top', onReachedTop);
-    viewEvent.on('toggle-reached-bottom', toggleOnReachedBottom);
-
-    return () => {
-      roomTimeline.removeListener(cons.events.roomTimeline.EVENT, updateRT);
-      roomTimeline.removeListener(cons.events.roomTimeline.PAGINATED, updatePAG);
-      viewEvent.removeListener('reached-top', onReachedTop);
-      viewEvent.removeListener('toggle-reached-bottom', toggleOnReachedBottom);
-    };
-  }, [roomTimeline, isReachedTimelineEnd, onPagination]);
-
-  useLayoutEffect(() => {
-    timelineScroll.reachBottom();
-    autoLoadTimeline();
-  }, [roomTimeline]);
-
-  useLayoutEffect(() => {
-    if (onPagination === null) return;
-    timelineScroll.tryRestoringScroll();
-  }, [onPagination]);
-
-  useEffect(() => {
-    if (onStateUpdate === null) return;
-    if (wasAtBottom) timelineScroll.reachBottom();
-  }, [onStateUpdate]);
-
-  let prevMEvent = null;
-  function genMessage(mEvent) {
-    const myPowerlevel = roomTimeline.room.getMember(mx.getUserId()).powerLevel;
-    const canIRedact = roomTimeline.room.currentState.hasSufficientPowerLevelFor('redact', myPowerlevel);
-
-    const isContentOnly = (
-      prevMEvent !== null
-      && prevMEvent.getType() !== 'm.room.member'
-      && diffMinutes(mEvent.getDate(), prevMEvent.getDate()) <= MAX_MSG_DIFF_MINUTES
-      && prevMEvent.getSender() === mEvent.getSender()
-    );
-
-    let content = mEvent.getContent().body;
-    if (typeof content === 'undefined') return null;
-    const msgType = mEvent.getContent()?.msgtype;
-    let reply = null;
-    let reactions = null;
-    let isMarkdown = mEvent.getContent().format === 'org.matrix.custom.html';
-    const isReply = typeof mEvent.getWireContent()['m.relates_to']?.['m.in_reply_to'] !== 'undefined';
-    const isEdited = roomTimeline.editedTimeline.has(mEvent.getId());
-    const haveReactions = roomTimeline.reactionTimeline.has(mEvent.getId());
-
-    if (isReply) {
-      const parsedContent = parseReply(content);
-      if (parsedContent !== null) {
-        const c = roomTimeline.room.currentState;
-        const displayNameToUserIds = c.getUserIdsWithDisplayName(parsedContent.displayName);
-        const ID = parsedContent.userId || displayNameToUserIds[0];
-        reply = {
-          color: colorMXID(ID || parsedContent.displayName),
-          to: parsedContent.displayName || getUsername(parsedContent.userId),
-          content: parsedContent.replyContent,
-        };
-        content = parsedContent.content;
-      }
-    }
-
-    if (isEdited) {
-      const editedList = roomTimeline.editedTimeline.get(mEvent.getId());
-      const latestEdited = editedList[editedList.length - 1];
-      if (typeof latestEdited.getContent()['m.new_content'] === 'undefined') return null;
-      const latestEditBody = latestEdited.getContent()['m.new_content'].body;
-      const parsedEditedContent = parseReply(latestEditBody);
-      isMarkdown = latestEdited.getContent()['m.new_content'].format === 'org.matrix.custom.html';
-      if (parsedEditedContent === null) {
-        content = latestEditBody;
-      } else {
-        content = parsedEditedContent.content;
-      }
-    }
-
-    if (haveReactions) {
-      reactions = [];
-      roomTimeline.reactionTimeline.get(mEvent.getId()).forEach((rEvent) => {
-        if (rEvent.getRelation() === null) return;
-        function alreadyHaveThisReaction(rE) {
-          for (let i = 0; i < reactions.length; i += 1) {
-            if (reactions[i].key === rE.getRelation().key) return true;
-          }
-          return false;
-        }
-        if (alreadyHaveThisReaction(rEvent)) {
-          for (let i = 0; i < reactions.length; i += 1) {
-            if (reactions[i].key === rEvent.getRelation().key) {
-              reactions[i].users.push(rEvent.getSender());
-              if (reactions[i].isActive !== true) {
-                const myUserId = initMatrix.matrixClient.getUserId();
-                reactions[i].isActive = rEvent.getSender() === myUserId;
-                if (reactions[i].isActive) reactions[i].id = rEvent.getId();
-              }
-              break;
-            }
-          }
-        } else {
-          reactions.push({
-            id: rEvent.getId(),
-            key: rEvent.getRelation().key,
-            users: [rEvent.getSender()],
-            isActive: (rEvent.getSender() === initMatrix.matrixClient.getUserId()),
-          });
-        }
-      });
-    }
-
-    const senderMXIDColor = colorMXID(mEvent.sender.userId);
-    const userAvatar = isContentOnly ? null : (
-      <button type="button" onClick={() => openProfileViewer(mEvent.sender.userId, roomId)}>
-        <Avatar
-          imageSrc={mEvent.sender.getAvatarUrl(initMatrix.matrixClient.baseUrl, 36, 36, 'crop')}
-          text={getUsernameOfRoomMember(mEvent.sender)}
-          bgColor={senderMXIDColor}
-          size="small"
-        />
-      </button>
-    );
-    const userHeader = isContentOnly ? null : (
-      <MessageHeader
-        userId={mEvent.sender.userId}
-        name={getUsernameOfRoomMember(mEvent.sender)}
-        color={senderMXIDColor}
-        time={`${dateFormat(mEvent.getDate(), 'hh:MM TT')}`}
-      />
-    );
-    const userReply = reply === null ? null : (
-      <MessageReply
-        name={reply.to}
-        color={reply.color}
-        content={reply.content}
-      />
-    );
-    const userContent = (
-      <MessageContent
-        senderName={getUsernameOfRoomMember(mEvent.sender)}
-        isMarkdown={isMarkdown}
-        content={isMedia(mEvent) ? genMediaContent(mEvent) : content}
-        msgType={msgType}
-        isEdited={isEdited}
-      />
-    );
-    const userReactions = reactions === null ? null : (
-      <MessageReactionGroup>
-        {
-          reactions.map((reaction) => (
-            <MessageReaction
-              key={reaction.id}
-              reaction={reaction.key}
-              users={reaction.users}
-              isActive={reaction.isActive}
-              onClick={() => {
-                toggleEmoji(roomId, mEvent.getId(), reaction.key, roomTimeline);
-              }}
-            />
-          ))
-        }
-        <IconButton
-          onClick={(e) => pickEmoji(e, roomId, mEvent.getId(), roomTimeline)}
-          src={EmojiAddIC}
-          size="extra-small"
-          tooltip="Add reaction"
-        />
-      </MessageReactionGroup>
-    );
-    const userOptions = (
-      <MessageOptions>
-        <IconButton
-          onClick={(e) => pickEmoji(e, roomId, mEvent.getId(), roomTimeline)}
-          src={EmojiAddIC}
-          size="extra-small"
-          tooltip="Add reaction"
-        />
-        <IconButton
-          onClick={() => {
-            viewEvent.emit('reply_to', mEvent.getSender(), mEvent.getId(), isMedia(mEvent) ? mEvent.getContent().body : content);
-          }}
-          src={ReplyArrowIC}
-          size="extra-small"
-          tooltip="Reply"
-        />
-        {(mEvent.getSender() === mx.getUserId() && !isMedia(mEvent)) && (
-          <IconButton
-            onClick={() => setEditEvent(mEvent)}
-            src={PencilIC}
-            size="extra-small"
-            tooltip="Edit"
-          />
-        )}
-        <ContextMenu
-          content={() => (
-            <>
-              <MenuHeader>Options</MenuHeader>
-              <MenuItem
-                iconSrc={EmojiAddIC}
-                onClick={(e) => pickEmoji(e, roomId, mEvent.getId(), roomTimeline)}
-              >
-                Add reaction
-              </MenuItem>
-              <MenuItem
-                iconSrc={ReplyArrowIC}
-                onClick={() => {
-                  viewEvent.emit('reply_to', mEvent.getSender(), mEvent.getId(), isMedia(mEvent) ? mEvent.getContent().body : content);
-                }}
-              >
-                Reply
-              </MenuItem>
-              {(mEvent.getSender() === mx.getUserId() && !isMedia(mEvent)) && (
-                <MenuItem iconSrc={PencilIC} onClick={() => setEditEvent(mEvent)}>Edit</MenuItem>
-              )}
-              <MenuItem
-                iconSrc={TickMarkIC}
-                onClick={() => openReadReceipts(roomId, mEvent.getId())}
-              >
-                Read receipts
-              </MenuItem>
-              {(canIRedact || mEvent.getSender() === mx.getUserId()) && (
-                <>
-                  <MenuBorder />
-                  <MenuItem
-                    variant="danger"
-                    iconSrc={BinIC}
-                    onClick={() => {
-                      if (window.confirm('Are you sure you want to delete this event')) {
-                        redactEvent(roomId, mEvent.getId());
-                      }
-                    }}
-                  >
-                    Delete
-                  </MenuItem>
-                </>
-              )}
-            </>
-          )}
-          render={(toggleMenu) => (
-            <IconButton
-              onClick={toggleMenu}
-              src={VerticalMenuIC}
-              size="extra-small"
-              tooltip="Options"
-            />
-          )}
-        />
-      </MessageOptions>
-    );
-
-    const isEditingEvent = editEvent?.getId() === mEvent.getId();
-    const myMessageEl = (
-      <Message
-        key={mEvent.getId()}
-        avatar={userAvatar}
-        header={userHeader}
-        reply={userReply}
-        content={editEvent !== null && isEditingEvent ? null : userContent}
-        msgType={msgType}
-        editContent={editEvent !== null && isEditingEvent ? (
-          <MessageEdit
-            content={content}
-            onSave={(newBody) => {
-              if (newBody !== content) {
-                initMatrix.roomsInput.sendEditedMessage(roomId, mEvent, newBody);
-              }
-              setEditEvent(null);
-            }}
-            onCancel={() => setEditEvent(null)}
-          />
-        ) : null}
-        reactions={userReactions}
-        options={editEvent !== null && isEditingEvent ? null : userOptions}
-      />
-    );
-    return myMessageEl;
-  }
-
-  function renderMessage(mEvent) {
-    if (mEvent.getType() === 'm.room.create') return genRoomIntro(mEvent, roomTimeline);
-    if (
-      mEvent.getType() !== 'm.room.message'
-      && mEvent.getType() !== 'm.room.encrypted'
-      && mEvent.getType() !== 'm.room.member'
-      && mEvent.getType() !== 'm.sticker'
-    ) return false;
-    if (mEvent.getRelation()?.rel_type === 'm.replace') return false;
-
-    // ignore if message is deleted
-    if (mEvent.isRedacted()) return false;
-
-    let divider = null;
-    if (prevMEvent !== null && isNotInSameDay(mEvent.getDate(), prevMEvent.getDate())) {
-      divider = <Divider key={`divider-${mEvent.getId()}`} text={`${dateFormat(mEvent.getDate(), 'mmmm dd, yyyy')}`} />;
-    }
-
-    if (mEvent.getType() !== 'm.room.member') {
-      const messageComp = genMessage(mEvent);
-      prevMEvent = mEvent;
-      return (
-        <React.Fragment key={`box-${mEvent.getId()}`}>
-          {divider}
-          {messageComp}
-        </React.Fragment>
-      );
-    }
-
-    prevMEvent = mEvent;
+  if (mEvent.getType() === 'm.room.member') {
     const timelineChange = parseTimelineChange(mEvent);
-    if (timelineChange === null) return null;
+    if (timelineChange === null) return <div key={mEvent.getId()} />;
     return (
-      <React.Fragment key={`box-${mEvent.getId()}`}>
-        {divider}
-        <TimelineChange
-          key={mEvent.getId()}
-          variant={timelineChange.variant}
-          content={timelineChange.content}
-          time={`${dateFormat(mEvent.getDate(), 'hh:MM TT')}`}
-        />
-      </React.Fragment>
+      <TimelineChange
+        key={mEvent.getId()}
+        variant={timelineChange.variant}
+        content={timelineChange.content}
+        time={time}
+      />
     );
   }
-
   return (
-    <div className="room-view__content">
-      <div className="timeline__wrapper">
-        { roomTimeline.timeline[0].getType() !== 'm.room.create' && !isReachedTimelineEnd && genPlaceholders() }
-        { roomTimeline.timeline[0].getType() !== 'm.room.create' && isReachedTimelineEnd && genRoomIntro(undefined, roomTimeline)}
-        { roomTimeline.timeline.map(renderMessage) }
-      </div>
-    </div>
+    <Message
+      key={mEvent.getId()}
+      mEvent={mEvent}
+      isBodyOnly={isBodyOnly}
+      roomTimeline={roomTimeline}
+      focus={isFocus}
+      time={time}
+    />
   );
 }
+
+class TimelineScroll extends EventEmitter {
+  constructor(target) {
+    super();
+    if (target === null) {
+      throw new Error('Can not initialize TimelineScroll, target HTMLElement in null');
+    }
+    this.scroll = target;
+
+    this.backwards = false;
+    this.inTopHalf = false;
+    this.maxEvents = DEFAULT_MAX_EVENTS;
+
+    this.isScrollable = false;
+    this.top = 0;
+    this.bottom = 0;
+    this.height = 0;
+    this.viewHeight = 0;
+
+    this.topMsg = null;
+    this.bottomMsg = null;
+    this.diff = 0;
+  }
+
+  scrollToBottom() {
+    const scrollInfo = getScrollInfo(this.scroll);
+    const maxScrollTop = scrollInfo.height - scrollInfo.viewHeight;
+
+    this._scrollTo(scrollInfo, maxScrollTop);
+  }
+
+  // restore scroll using previous calc by this._updateTopBottomMsg() and this._calcDiff.
+  tryRestoringScroll() {
+    const scrollInfo = getScrollInfo(this.scroll);
+
+    let scrollTop = 0;
+    const ot = this.inTopHalf ? this.topMsg?.offsetTop : this.bottomMsg?.offsetTop;
+    if (!ot) scrollTop = Math.round(this.height - this.viewHeight);
+    else scrollTop = ot - this.diff;
+
+    this._scrollTo(scrollInfo, scrollTop);
+  }
+
+  scrollToIndex(index, offset = 0) {
+    const scrollInfo = getScrollInfo(this.scroll);
+    const msgs = this.scroll.lastElementChild.lastElementChild.children;
+    const offsetTop = msgs[index]?.offsetTop;
+
+    if (offsetTop === undefined) return;
+    // if msg is already in visible are we don't need to scroll to that
+    if (offsetTop > scrollInfo.top && offsetTop < (scrollInfo.top + scrollInfo.viewHeight)) return;
+    const to = offsetTop - offset;
+
+    this._scrollTo(scrollInfo, to);
+  }
+
+  _scrollTo(scrollInfo, scrollTop) {
+    this.scroll.scrollTop = scrollTop;
+
+    // browser emit 'onscroll' event only if the 'element.scrollTop' value changes.
+    // so here we flag that the upcoming 'onscroll' event is
+    // emitted as side effect of assigning 'this.scroll.scrollTop' above
+    // only if it's changes.
+    // by doing so we prevent this._updateCalc() from calc again.
+    if (scrollTop !== this.top) {
+      this.scrolledByCode = true;
+    }
+    const sInfo = { ...scrollInfo };
+
+    const maxScrollTop = scrollInfo.height - scrollInfo.viewHeight;
+
+    sInfo.top = (scrollTop > maxScrollTop) ? maxScrollTop : scrollTop;
+    this._updateCalc(sInfo);
+  }
+
+  // we maintain reference of top and bottom messages
+  // to restore the scroll position when
+  // messages gets removed from either end and added to other.
+  _updateTopBottomMsg() {
+    const msgs = this.scroll.lastElementChild.lastElementChild.children;
+    const lMsgIndex = msgs.length - 1;
+
+    this.topMsg = msgs[0]?.className === 'ph-msg'
+      ? msgs[PLACEHOLDER_COUNT]
+      : msgs[0];
+    this.bottomMsg = msgs[lMsgIndex]?.className === 'ph-msg'
+      ? msgs[lMsgIndex - PLACEHOLDER_COUNT]
+      : msgs[lMsgIndex];
+  }
+
+  // we calculate the difference between first/last message and current scrollTop.
+  // if we are going above we calc diff between first and scrollTop
+  // else otherwise.
+  // NOTE: This will help to restore the scroll when msgs get's removed
+  // from one end and added to other end
+  _calcDiff(scrollInfo) {
+    if (!this.topMsg || !this.bottomMsg) return 0;
+    if (this.inTopHalf) {
+      return this.topMsg.offsetTop - scrollInfo.top;
+    }
+    return this.bottomMsg.offsetTop - scrollInfo.top;
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  _calcMaxEvents(scrollInfo) {
+    return Math.round(scrollInfo.viewHeight / SMALLEST_MSG_HEIGHT) * PAGES_COUNT;
+  }
+
+  _updateCalc(scrollInfo) {
+    const halfViewHeight = Math.round(scrollInfo.viewHeight / 2);
+    const scrollMiddle = scrollInfo.top + halfViewHeight;
+    const lastMiddle = this.top + halfViewHeight;
+
+    this.backwards = scrollMiddle < lastMiddle;
+    this.inTopHalf = scrollMiddle < scrollInfo.height / 2;
+
+    this.isScrollable = scrollInfo.isScrollable;
+    this.top = scrollInfo.top;
+    this.bottom = scrollInfo.height - (scrollInfo.top + scrollInfo.viewHeight);
+    this.height = scrollInfo.height;
+
+    // only calculate maxEvents if viewHeight change
+    if (this.viewHeight !== scrollInfo.viewHeight) {
+      this.maxEvents = this._calcMaxEvents(scrollInfo);
+      this.viewHeight = scrollInfo.viewHeight;
+    }
+
+    this._updateTopBottomMsg();
+    this.diff = this._calcDiff(scrollInfo);
+  }
+
+  calcScroll() {
+    if (this.scrolledByCode) {
+      this.scrolledByCode = false;
+      return;
+    }
+
+    const scrollInfo = getScrollInfo(this.scroll);
+    this._updateCalc(scrollInfo);
+
+    this.emit('scroll', this.backwards);
+  }
+}
+
+let timelineScroll = null;
+let jumpToItemIndex = -1;
+const throttle = new Throttle();
+const limit = {
+  from: 0,
+  getMaxEvents() {
+    return timelineScroll?.maxEvents ?? DEFAULT_MAX_EVENTS;
+  },
+  getEndIndex() {
+    return this.from + this.getMaxEvents();
+  },
+  calcNextFrom(backwards, tLength) {
+    let newFrom = backwards ? this.from - PAG_LIMIT : this.from + PAG_LIMIT;
+    if (!backwards && newFrom + this.getMaxEvents() > tLength) {
+      newFrom = tLength - this.getMaxEvents();
+    }
+    if (newFrom < 0) newFrom = 0;
+    return newFrom;
+  },
+  setFrom(from) {
+    if (from < 0) {
+      this.from = 0;
+      return;
+    }
+    this.from = from;
+  },
+};
+
+function useTimeline(roomTimeline, eventId, readEventStore) {
+  const [timelineInfo, setTimelineInfo] = useState(null);
+
+  const setEventTimeline = async (eId) => {
+    if (typeof eId === 'string') {
+      const isLoaded = await roomTimeline.loadEventTimeline(eId);
+      if (isLoaded) return;
+      // if eventTimeline failed to load,
+      // we will load live timeline as fallback.
+    }
+    roomTimeline.loadLiveTimeline();
+  };
+
+  useEffect(() => {
+    const initTimeline = (eId) => {
+      // NOTICE: eId can be id of readUpto, reply or specific event.
+      // readUpTo: when user click jump to unread message button.
+      // reply: when user click reply from timeline.
+      // specific event when user open a link of event. behave same as ^^^^
+      const readUpToId = roomTimeline.getReadUpToEventId();
+      let focusEventIndex = -1;
+      const isSpecificEvent = eId && eId !== readUpToId;
+
+      if (isSpecificEvent) {
+        focusEventIndex = roomTimeline.getEventIndex(eId);
+      } else if (!readEventStore.getItem()) {
+        // either opening live timeline or jump to unread.
+        focusEventIndex = roomTimeline.getUnreadEventIndex(readUpToId);
+        if (roomTimeline.hasEventInTimeline(readUpToId)) {
+          readEventStore.setItem(roomTimeline.findEventByIdInTimelineSet(readUpToId));
+        }
+      } else {
+        focusEventIndex = roomTimeline.getUnreadEventIndex(readEventStore.getItem().getId());
+      }
+
+      if (focusEventIndex > -1) {
+        limit.setFrom(focusEventIndex - Math.round(limit.getMaxEvents() / 2));
+      } else {
+        limit.setFrom(roomTimeline.timeline.length - limit.getMaxEvents());
+      }
+      setTimelineInfo({ focusEventId: isSpecificEvent ? eId : null });
+    };
+
+    roomTimeline.on(cons.events.roomTimeline.READY, initTimeline);
+    setEventTimeline(eventId);
+    return () => {
+      roomTimeline.removeListener(cons.events.roomTimeline.READY, initTimeline);
+      roomTimeline.removeInternalListeners();
+      limit.setFrom(0);
+    };
+  }, [roomTimeline, eventId]);
+
+  return timelineInfo;
+}
+
+function usePaginate(roomTimeline, readEventStore, forceUpdateLimit) {
+  const [info, setInfo] = useState(null);
+
+  useEffect(() => {
+    const handleOnPagination = (backwards, loaded) => {
+      if (loaded === 0) return;
+      if (!readEventStore.getItem()) {
+        const readUpToId = roomTimeline.getReadUpToEventId();
+        readEventStore.setItem(roomTimeline.findEventByIdInTimelineSet(readUpToId));
+      }
+      limit.setFrom(limit.calcNextFrom(backwards, roomTimeline.timeline.length));
+      setTimeout(() => setInfo({
+        backwards,
+        loaded,
+      }));
+    };
+    roomTimeline.on(cons.events.roomTimeline.PAGINATED, handleOnPagination);
+    return () => {
+      roomTimeline.on(cons.events.roomTimeline.PAGINATED, handleOnPagination);
+    };
+  }, [roomTimeline]);
+
+  const autoPaginate = useCallback(async () => {
+    if (roomTimeline.isOngoingPagination) return;
+    const tLength = roomTimeline.timeline.length;
+
+    if (timelineScroll.bottom < SCROLL_TRIGGER_POS) {
+      if (limit.getEndIndex() < tLength) {
+        // paginate from memory
+        limit.setFrom(limit.calcNextFrom(false, tLength));
+        forceUpdateLimit();
+      } else if (roomTimeline.canPaginateForward()) {
+        // paginate from server.
+        await roomTimeline.paginateTimeline(false, PAG_LIMIT);
+        return;
+      }
+    }
+    if (timelineScroll.top < SCROLL_TRIGGER_POS) {
+      if (limit.from > 0) {
+        // paginate from memory
+        limit.setFrom(limit.calcNextFrom(true, tLength));
+        forceUpdateLimit();
+      } else if (roomTimeline.canPaginateBackward()) {
+        // paginate from server.
+        await roomTimeline.paginateTimeline(true, PAG_LIMIT);
+      }
+    }
+  }, [roomTimeline]);
+
+  return [info, autoPaginate];
+}
+
+function useHandleScroll(roomTimeline, autoPaginate, readEventStore, forceUpdateLimit) {
+  const handleScroll = useCallback(() => {
+    requestAnimationFrame(() => {
+      // emit event to toggle scrollToBottom button visibility
+      const isAtBottom = (
+        timelineScroll.bottom < 16 && !roomTimeline.canPaginateForward()
+        && limit.getEndIndex() >= roomTimeline.timeline.length
+      );
+      roomTimeline.emit(cons.events.roomTimeline.AT_BOTTOM, isAtBottom);
+      if (isAtBottom && readEventStore.getItem()) {
+        requestAnimationFrame(() => roomTimeline.markAllAsRead());
+      }
+    });
+    autoPaginate();
+  }, [roomTimeline]);
+
+  const handleScrollToLive = useCallback(() => {
+    if (readEventStore.getItem()) {
+      requestAnimationFrame(() => roomTimeline.markAllAsRead());
+    }
+    if (roomTimeline.isServingLiveTimeline()) {
+      limit.setFrom(roomTimeline.timeline.length - limit.getMaxEvents());
+      timelineScroll.scrollToBottom();
+      forceUpdateLimit();
+      return;
+    }
+    roomTimeline.loadLiveTimeline();
+  }, [roomTimeline]);
+
+  return [handleScroll, handleScrollToLive];
+}
+
+function useEventArrive(roomTimeline, readEventStore) {
+  const myUserId = initMatrix.matrixClient.getUserId();
+  const [newEvent, setEvent] = useState(null);
+  useEffect(() => {
+    const sendReadReceipt = (event) => {
+      if (event.isSending()) return;
+      if (myUserId === event.getSender()) {
+        roomTimeline.markAllAsRead();
+        return;
+      }
+      const readUpToEvent = readEventStore.getItem();
+      const readUpToId = roomTimeline.getReadUpToEventId();
+
+      // if user doesn't have focus on app don't mark messages as read.
+      if (document.visibilityState === 'hidden' || timelineScroll.bottom >= 16) {
+        if (readUpToEvent === readUpToId) return;
+        readEventStore.setItem(roomTimeline.findEventByIdInTimelineSet(readUpToId));
+        return;
+      }
+      const isUnreadMsg = readUpToEvent?.getId() === readUpToId;
+      if (!isUnreadMsg) {
+        roomTimeline.markAllAsRead();
+      }
+      const { timeline } = roomTimeline;
+      const unreadMsgIsLast = timeline[timeline.length - 2].getId() === readUpToEvent?.getId();
+      if (unreadMsgIsLast) {
+        roomTimeline.markAllAsRead();
+      }
+    };
+
+    const handleEvent = (event) => {
+      const tLength = roomTimeline.timeline.length;
+      const isUserViewingLive = (
+        roomTimeline.isServingLiveTimeline()
+        && limit.getEndIndex() >= tLength - 1
+        && timelineScroll.bottom < SCROLL_TRIGGER_POS
+      );
+      if (isUserViewingLive) {
+        limit.setFrom(tLength - limit.getMaxEvents());
+        sendReadReceipt(event);
+        setEvent(event);
+        return;
+      }
+      const isRelates = (event.getType() === 'm.reaction' || event.getRelation()?.rel_type === 'm.replace');
+      if (isRelates) {
+        setEvent(event);
+        return;
+      }
+      const isUserDitchedLive = (
+        roomTimeline.isServingLiveTimeline()
+        && limit.getEndIndex() >= tLength - 1
+      );
+      if (isUserDitchedLive) {
+        // This stateUpdate will help to put the
+        // loading msg placeholder at bottom
+        setEvent(event);
+      }
+    };
+
+    const handleEventRedact = (event) => setEvent(event);
+
+    roomTimeline.on(cons.events.roomTimeline.EVENT, handleEvent);
+    roomTimeline.on(cons.events.roomTimeline.EVENT_REDACTED, handleEventRedact);
+    return () => {
+      roomTimeline.removeListener(cons.events.roomTimeline.EVENT, handleEvent);
+      roomTimeline.removeListener(cons.events.roomTimeline.EVENT_REDACTED, handleEventRedact);
+    };
+  }, [roomTimeline]);
+
+  useEffect(() => {
+    if (!roomTimeline.initialized) return;
+    if (timelineScroll.bottom < 16
+      && !roomTimeline.canPaginateForward()
+      && document.visibilityState === 'visible') {
+      timelineScroll.scrollToBottom();
+    }
+  }, [newEvent, roomTimeline]);
+}
+
+function RoomViewContent({ eventId, roomTimeline }) {
+  const timelineSVRef = useRef(null);
+  const readEventStore = useStore(roomTimeline);
+  const timelineInfo = useTimeline(roomTimeline, eventId, readEventStore);
+  const [onLimitUpdate, forceUpdateLimit] = useForceUpdate();
+  const [paginateInfo, autoPaginate] = usePaginate(roomTimeline, readEventStore, forceUpdateLimit);
+  const [handleScroll, handleScrollToLive] = useHandleScroll(
+    roomTimeline, autoPaginate, readEventStore, forceUpdateLimit,
+  );
+  useEventArrive(roomTimeline, readEventStore);
+  const { timeline } = roomTimeline;
+
+  useLayoutEffect(() => {
+    if (!roomTimeline.initialized) {
+      timelineScroll = new TimelineScroll(timelineSVRef.current);
+    }
+  });
+
+  // when active timeline changes
+  useEffect(() => {
+    if (!roomTimeline.initialized) return undefined;
+
+    if (timeline.length > 0) {
+      if (jumpToItemIndex === -1) {
+        timelineScroll.scrollToBottom();
+      } else {
+        timelineScroll.scrollToIndex(jumpToItemIndex, 80);
+      }
+      if (timelineScroll.bottom < 16 && !roomTimeline.canPaginateForward()) {
+        const readUpToId = roomTimeline.getReadUpToEventId();
+        if (readEventStore.getItem()?.getId() === readUpToId || readUpToId === null) {
+          requestAnimationFrame(() => roomTimeline.markAllAsRead());
+        }
+      }
+      jumpToItemIndex = -1;
+    }
+    autoPaginate();
+
+    timelineScroll.on('scroll', handleScroll);
+    roomTimeline.on(cons.events.roomTimeline.SCROLL_TO_LIVE, handleScrollToLive);
+    return () => {
+      if (timelineSVRef.current === null) return;
+      timelineScroll.removeListener('scroll', handleScroll);
+      roomTimeline.removeListener(cons.events.roomTimeline.SCROLL_TO_LIVE, handleScrollToLive);
+    };
+  }, [timelineInfo]);
+
+  // when paginating from server
+  useEffect(() => {
+    if (!roomTimeline.initialized) return;
+    timelineScroll.tryRestoringScroll();
+    autoPaginate();
+  }, [paginateInfo]);
+
+  // when paginating locally
+  useEffect(() => {
+    if (!roomTimeline.initialized) return;
+    timelineScroll.tryRestoringScroll();
+  }, [onLimitUpdate]);
+
+  const handleTimelineScroll = (event) => {
+    const { target } = event;
+    if (!target) return;
+    throttle._(() => timelineScroll?.calcScroll(), 400)(target);
+  };
+
+  const renderTimeline = () => {
+    const tl = [];
+
+    let itemCountIndex = 0;
+    jumpToItemIndex = -1;
+    const readEvent = readEventStore.getItem();
+    let unreadDivider = false;
+
+    if (roomTimeline.canPaginateBackward() || limit.from > 0) {
+      tl.push(loadingMsgPlaceholders(1, PLACEHOLDER_COUNT));
+      itemCountIndex += PLACEHOLDER_COUNT;
+    }
+    for (let i = limit.from; i < limit.getEndIndex(); i += 1) {
+      if (i >= timeline.length) break;
+      const mEvent = timeline[i];
+      const prevMEvent = timeline[i - 1] ?? null;
+
+      if (i === 0 && !roomTimeline.canPaginateBackward()) {
+        if (mEvent.getType() === 'm.room.create') {
+          tl.push(genRoomIntro(mEvent, roomTimeline));
+          itemCountIndex += 1;
+          // eslint-disable-next-line no-continue
+          continue;
+        } else {
+          tl.push(genRoomIntro(undefined, roomTimeline));
+          itemCountIndex += 1;
+        }
+      }
+
+      unreadDivider = (readEvent && !unreadDivider
+        && prevMEvent?.getTs() <= readEvent.getTs()
+        && readEvent.getTs() < mEvent.getTs());
+      if (unreadDivider) {
+        tl.push(<Divider key={`new-${mEvent.getId()}`} variant="positive" text="New messages" />);
+        itemCountIndex += 1;
+        if (jumpToItemIndex === -1) jumpToItemIndex = itemCountIndex;
+      }
+      const dayDivider = prevMEvent && !isInSameDay(mEvent.getDate(), prevMEvent.getDate());
+      if (dayDivider) {
+        tl.push(<Divider key={`divider-${mEvent.getId()}`} text={`${dateFormat(mEvent.getDate(), 'mmmm dd, yyyy')}`} />);
+        itemCountIndex += 1;
+      }
+
+      const focusId = timelineInfo.focusEventId;
+      const isFocus = focusId === mEvent.getId();
+      if (isFocus) jumpToItemIndex = itemCountIndex;
+
+      tl.push(renderEvent(roomTimeline, mEvent, prevMEvent, isFocus));
+      itemCountIndex += 1;
+    }
+    if (roomTimeline.canPaginateForward() || limit.getEndIndex() < timeline.length) {
+      tl.push(loadingMsgPlaceholders(2, PLACEHOLDER_COUNT));
+    }
+
+    return tl;
+  };
+
+  return (
+    <ScrollView onScroll={handleTimelineScroll} ref={timelineSVRef} autoHide>
+      <div className="room-view__content" onClick={handleOnClickCapture}>
+        <div className="timeline__wrapper">
+          { roomTimeline.initialized ? renderTimeline() : loadingMsgPlaceholders('loading', 3) }
+        </div>
+      </div>
+    </ScrollView>
+  );
+}
+
+RoomViewContent.defaultProps = {
+  eventId: null,
+};
 RoomViewContent.propTypes = {
-  roomId: PropTypes.string.isRequired,
+  eventId: PropTypes.string,
   roomTimeline: PropTypes.shape({}).isRequired,
-  timelineScroll: PropTypes.shape({}).isRequired,
-  viewEvent: PropTypes.shape({}).isRequired,
 };
 
 export default RoomViewContent;

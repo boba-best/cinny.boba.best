@@ -1,5 +1,7 @@
 import React from 'react';
 
+import { twemojify } from '../../../util/twemojify';
+
 import initMatrix from '../../../client/initMatrix';
 import { getUsername, getUsernameOfRoomMember } from '../../../util/matrixUtil';
 
@@ -8,7 +10,7 @@ function getTimelineJSXMessages() {
     join(user) {
       return (
         <>
-          <b>{user}</b>
+          <b>{twemojify(user)}</b>
           {' joined the room'}
         </>
       );
@@ -17,27 +19,27 @@ function getTimelineJSXMessages() {
       const reasonMsg = (typeof reason === 'string') ? `: ${reason}` : '';
       return (
         <>
-          <b>{user}</b>
+          <b>{twemojify(user)}</b>
           {' left the room'}
-          {reasonMsg}
+          {twemojify(reasonMsg)}
         </>
       );
     },
     invite(inviter, user) {
       return (
         <>
-          <b>{inviter}</b>
+          <b>{twemojify(inviter)}</b>
           {' invited '}
-          <b>{user}</b>
+          <b>{twemojify(user)}</b>
         </>
       );
     },
     cancelInvite(inviter, user) {
       return (
         <>
-          <b>{inviter}</b>
+          <b>{twemojify(inviter)}</b>
           {' canceled '}
-          <b>{user}</b>
+          <b>{twemojify(user)}</b>
           {'\'s invite'}
         </>
       );
@@ -45,7 +47,7 @@ function getTimelineJSXMessages() {
     rejectInvite(user) {
       return (
         <>
-          <b>{user}</b>
+          <b>{twemojify(user)}</b>
           {' rejected the invitation'}
         </>
       );
@@ -54,10 +56,10 @@ function getTimelineJSXMessages() {
       const reasonMsg = (typeof reason === 'string') ? `: ${reason}` : '';
       return (
         <>
-          <b>{actor}</b>
+          <b>{twemojify(actor)}</b>
           {' kicked '}
-          <b>{user}</b>
-          {reasonMsg}
+          <b>{twemojify(user)}</b>
+          {twemojify(reasonMsg)}
         </>
       );
     },
@@ -65,26 +67,26 @@ function getTimelineJSXMessages() {
       const reasonMsg = (typeof reason === 'string') ? `: ${reason}` : '';
       return (
         <>
-          <b>{actor}</b>
+          <b>{twemojify(actor)}</b>
           {' banned '}
-          <b>{user}</b>
-          {reasonMsg}
+          <b>{twemojify(user)}</b>
+          {twemojify(reasonMsg)}
         </>
       );
     },
     unban(actor, user) {
       return (
         <>
-          <b>{actor}</b>
+          <b>{twemojify(actor)}</b>
           {' unbanned '}
-          <b>{user}</b>
+          <b>{twemojify(user)}</b>
         </>
       );
     },
     avatarSets(user) {
       return (
         <>
-          <b>{user}</b>
+          <b>{twemojify(user)}</b>
           {' set the avatar'}
         </>
       );
@@ -92,7 +94,7 @@ function getTimelineJSXMessages() {
     avatarChanged(user) {
       return (
         <>
-          <b>{user}</b>
+          <b>{twemojify(user)}</b>
           {' changed the avatar'}
         </>
       );
@@ -100,7 +102,7 @@ function getTimelineJSXMessages() {
     avatarRemoved(user) {
       return (
         <>
-          <b>{user}</b>
+          <b>{twemojify(user)}</b>
           {' removed the avatar'}
         </>
       );
@@ -108,27 +110,27 @@ function getTimelineJSXMessages() {
     nameSets(user, newName) {
       return (
         <>
-          <b>{user}</b>
+          <b>{twemojify(user)}</b>
           {' set the display name to '}
-          <b>{newName}</b>
+          <b>{twemojify(newName)}</b>
         </>
       );
     },
     nameChanged(user, newName) {
       return (
         <>
-          <b>{user}</b>
+          <b>{twemojify(user)}</b>
           {' changed the display name to '}
-          <b>{newName}</b>
+          <b>{twemojify(newName)}</b>
         </>
       );
     },
     nameRemoved(user, lastName) {
       return (
         <>
-          <b>{user}</b>
+          <b>{twemojify(user)}</b>
           {' removed the display name '}
-          <b>{lastName}</b>
+          <b>{twemojify(lastName)}</b>
         </>
       );
     },
@@ -141,7 +143,7 @@ function getUsersActionJsx(roomId, userIds, actionStr) {
     if (room?.getMember(userId)) return getUsernameOfRoomMember(room.getMember(userId));
     return getUsername(userId);
   };
-  const getUserJSX = (userId) => <b>{getUserDisplayName(userId)}</b>;
+  const getUserJSX = (userId) => <b>{twemojify(getUserDisplayName(userId))}</b>;
   if (!Array.isArray(userIds)) return 'Idle';
   if (userIds.length === 0) return 'Idle';
   const MAX_VISIBLE_COUNT = 3;
@@ -163,27 +165,6 @@ function getUsersActionJsx(roomId, userIds, actionStr) {
   const othersCount = userIds.length - MAX_VISIBLE_COUNT;
   // eslint-disable-next-line react/jsx-one-expression-per-line
   return <>{u1Jsx}, {u2Jsx}, {u3Jsx} and {othersCount} other are {actionStr}</>;
-}
-
-function parseReply(rawContent) {
-  if (rawContent.indexOf('>') !== 0) return null;
-  let content = rawContent.slice(rawContent.indexOf('<') + 1);
-  const user = content.slice(0, content.indexOf('>'));
-
-  content = content.slice(content.indexOf('>') + 2);
-  const replyContent = content.slice(0, content.indexOf('\n\n'));
-  content = content.slice(content.indexOf('\n\n') + 2);
-
-  if (user === '') return null;
-
-  const isUserId = user.match(/^@.+:.+/);
-
-  return {
-    userId: isUserId ? user : null,
-    displayName: isUserId ? null : user,
-    replyContent,
-    content,
-  };
 }
 
 function parseTimelineChange(mEvent) {
@@ -234,39 +215,8 @@ function parseTimelineChange(mEvent) {
   }
 }
 
-function scrollToBottom(ref) {
-  const maxScrollTop = ref.current.scrollHeight - ref.current.offsetHeight;
-  // eslint-disable-next-line no-param-reassign
-  ref.current.scrollTop = maxScrollTop;
-}
-
-function isAtBottom(ref) {
-  const { scrollHeight, scrollTop, offsetHeight } = ref.current;
-  const scrollUptoBottom = scrollTop + offsetHeight;
-
-  // scroll view have to div inside div which contains messages
-  const lastMessage = ref.current.lastElementChild.lastElementChild.lastElementChild;
-  const lastChildHeight = lastMessage.offsetHeight;
-
-  // auto scroll to bottom even if user has EXTRA_SPACE left to scroll
-  const EXTRA_SPACE = 48;
-
-  if (scrollHeight - scrollUptoBottom <= lastChildHeight + EXTRA_SPACE) {
-    return true;
-  }
-  return false;
-}
-
-function autoScrollToBottom(ref) {
-  if (isAtBottom(ref)) scrollToBottom(ref);
-}
-
 export {
   getTimelineJSXMessages,
   getUsersActionJsx,
-  parseReply,
   parseTimelineChange,
-  scrollToBottom,
-  isAtBottom,
-  autoScrollToBottom,
 };

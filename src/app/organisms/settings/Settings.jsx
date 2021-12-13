@@ -5,7 +5,7 @@ import './Settings.scss';
 import initMatrix from '../../../client/initMatrix';
 import cons from '../../../client/state/cons';
 import settings from '../../../client/state/settings';
-import { toggleMarkdown } from '../../../client/action/settings';
+import { toggleMarkdown, toggleMembershipEvents, toggleNickAvatarEvents } from '../../../client/action/settings';
 
 import Text from '../../atoms/text/Text';
 import IconButton from '../../atoms/button/IconButton';
@@ -15,7 +15,8 @@ import SegmentedControls from '../../atoms/segmented-controls/SegmentedControls'
 
 import PopupWindow, { PWContentSelector } from '../../molecules/popup-window/PopupWindow';
 import SettingTile from '../../molecules/setting-tile/SettingTile';
-import ImportE2ERoomKeys from '../../molecules/import-e2e-room-keys/ImportE2ERoomKeys';
+import ImportE2ERoomKeys from '../../molecules/import-export-e2e-room-keys/ImportE2ERoomKeys';
+import ExportE2ERoomKeys from '../../molecules/import-export-e2e-room-keys/ExportE2ERoomKeys';
 
 import ProfileEditor from '../profile-editor/ProfileEditor';
 
@@ -65,10 +66,30 @@ function AppearanceSection() {
         options={(
           <Toggle
             isActive={settings.isMarkdown}
-            onToggle={(isMarkdown) => { toggleMarkdown(isMarkdown); updateState({}); }}
+            onToggle={() => { toggleMarkdown(); updateState({}); }}
           />
         )}
         content={<Text variant="b3">Format messages with markdown syntax before sending.</Text>}
+      />
+      <SettingTile
+        title="Hide membership events"
+        options={(
+          <Toggle
+            isActive={settings.hideMembershipEvents}
+            onToggle={() => { toggleMembershipEvents(); updateState({}); }}
+          />
+        )}
+        content={<Text variant="b3">Hide membership change messages from room timeline. (Join, Leave, Invite, Kick and Ban)</Text>}
+      />
+      <SettingTile
+        title="Hide nick/avatar events"
+        options={(
+          <Toggle
+            isActive={settings.hideNickAvatarEvents}
+            onToggle={() => { toggleNickAvatarEvents(); updateState({}); }}
+          />
+        )}
+        content={<Text variant="b3">Hide nick and avatar change messages from room timeline.</Text>}
       />
     </div>
   );
@@ -83,6 +104,15 @@ function SecuritySection() {
       <SettingTile
         title={`Device key: ${initMatrix.matrixClient.getDeviceEd25519Key().match(/.{1,4}/g).join(' ')}`}
         content={<Text variant="b3">Use this device ID-key combo to verify or manage this session from Element client.</Text>}
+      />
+      <SettingTile
+        title="Export E2E room keys"
+        content={(
+          <>
+            <Text variant="b3">Export end-to-end encryption room keys to decrypt old messages in other session. In order to encrypt keys you need to set a password, which will be used while importing.</Text>
+            <ExportE2ERoomKeys />
+          </>
+        )}
       />
       <SettingTile
         title="Import E2E room keys"

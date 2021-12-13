@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import './RoomSelector.scss';
 
+import { twemojify } from '../../../util/twemojify';
 import colorMXID from '../../../util/colorMXID';
 
 import Text from '../../atoms/text/Text';
@@ -40,7 +41,7 @@ RoomSelectorWrapper.propTypes = {
 };
 
 function RoomSelector({
-  name, roomId, imageSrc, iconSrc,
+  name, parentName, roomId, imageSrc, iconSrc,
   isSelected, isUnread, notificationCount, isAlert,
   options, onClick,
 }) {
@@ -57,7 +58,15 @@ function RoomSelector({
             iconSrc={iconSrc}
             size="extra-small"
           />
-          <Text variant="b1">{name}</Text>
+          <Text variant="b1">
+            {twemojify(name)}
+            {parentName && (
+              <span className="text text-b3">
+                {' — '}
+                {twemojify(parentName)}
+              </span>
+            )}
+          </Text>
           { isUnread && (
             <NotificationBadge
               alert={isAlert}
@@ -72,6 +81,7 @@ function RoomSelector({
   );
 }
 RoomSelector.defaultProps = {
+  parentName: null,
   isSelected: false,
   imageSrc: null,
   iconSrc: null,
@@ -79,6 +89,7 @@ RoomSelector.defaultProps = {
 };
 RoomSelector.propTypes = {
   name: PropTypes.string.isRequired,
+  parentName: PropTypes.string,
   roomId: PropTypes.string.isRequired,
   imageSrc: PropTypes.string,
   iconSrc: PropTypes.string,

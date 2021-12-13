@@ -23,9 +23,16 @@
   &__avatar-container {
     padding-top: 6px;
     margin-right: var(--sp-tight);
+    & .avatar-container {
+      transition: transform 200ms var(--fluid-push);
+      &:hover {
+        transform: translateY(-4px);
+      }
+    }
 
     & button {
       cursor: pointer;
+      display: flex;
     }
 
     [dir=rtl] & {
@@ -46,13 +53,17 @@
 
 .message {
   &--full + &--full,
-  &--content-only + &--full,
+  &--body-only + &--full,
   & + .timeline-change,
   .timeline-change + & {
     margin-top: var(--sp-normal);
   }
   &__avatar-container {
     width: var(--av-small);
+  }
+  &--focus {
+    box-shadow: inset 2px 0 0 var(--bg-caution);
+    background-color: var(--bg-caution-hover);
   }
 }
 
@@ -65,7 +76,7 @@
   }
 
   &__header,
-  &__content > div {
+  &__body > div {
     margin: var(--sp-ultra-tight) 0;
     margin-right: var(--sp-extra-tight);
     height: var(--fs-b1);
@@ -81,23 +92,24 @@
       }
     }
   }
-  &__content {
+  &__body {
     display: flex;
     flex-wrap: wrap;
   }
-  &__content > div:nth-child(1n) {
+  &__body > div:nth-child(1n) {
     max-width: 10%;
   }
-  &__content > div:nth-child(2n) {
+  &__body > div:nth-child(2n) {
     max-width: 50%;
   }
 }
 
 .message__reply,
-.message__content,
+.message__body,
+.message__body__wrapper,
 .message__edit,
 .message__reactions {
-  max-width: 640px;
+  max-width: calc(100% - 88px);
   min-width: 0;
 }
 
@@ -141,6 +153,19 @@
   }
 }
 .message__reply {
+  &-wrapper {
+    min-height: 20px;
+    cursor: pointer;
+    &:empty {
+      border-radius: calc(var(--bo-radius) / 2);
+      background-color: var(--bg-surface-hover);
+      max-width: 200px;
+      cursor: auto;
+    }
+    &:hover .text {
+      color: var(--tc-surface-high);
+    }
+  }
   .text {
     color: var(--tc-surface-low);
     white-space: nowrap;
@@ -152,15 +177,57 @@
     height: 14px;
   }
 }
-.message__content {
+.message__body {
   word-break: break-word;
-  
+
   & > .text > * {
     white-space: pre-wrap;
   }
 
   & a {
     word-break: break-word;
+  }
+  & span[data-mx-pill] {
+    background-color: hsla(0, 0%, 64%, 0.15);
+    padding: 0 2px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    &:hover {
+      background-color: hsla(0, 0%, 64%, 0.3);
+      color: var(--tc-surface-high);
+    }
+
+    &[data-mx-ping] {
+      background-color: var(--bg-ping);
+      &:hover {
+        background-color: var(--bg-ping-hover);
+      }
+    }
+  }
+
+  & span[data-mx-spoiler] {
+    border-radius: 4px;
+    background-color: rgba(124, 124, 124, 0.5);
+    color:transparent;
+    cursor: pointer;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    & > * {
+      opacity: 0;
+    }
+  }
+  .data-mx-spoiler--visible {
+    background-color: var(--bg-surface-active) !important;
+    color: inherit !important;
+    user-select: initial !important;
+    & > * {
+      opacity: inherit !important;
+    }
   }
   &-edited {
     color: var(--tc-surface-low);
@@ -200,7 +267,7 @@
   border-radius: 4px;
   cursor: pointer;
 
-  & .emoji {
+  & .react-emoji {
     width: 14px;
     height: 14px;
     margin: 2px;
@@ -209,7 +276,7 @@
     margin: 0 var(--sp-ultra-tight);
     color: var(--tc-surface-normal)
   }
-  &-tooltip .emoji {
+  &-tooltip .react-emoji  {
     width: 14px;
     height: 14px;
     margin: 0 var(--sp-ultra-tight);
@@ -249,7 +316,7 @@
   position: absolute;
   top: 0;
   right: 60px;
-  z-index: 999;
+  z-index: 99;
   transform: translateY(-50%);
 
   border-radius: var(--bo-radius);
@@ -262,39 +329,29 @@
     right: unset;
   }
 }
-@media (min-width: 1620px) {
-  .message__options {
-    right: unset;
-    left: 770px;
-    [dir=rtl] {
-      left: unset;
-      right: 770px
-    }
-  }
-}
 
 // markdown formating
-.message__content {
+.message__body {
   & h1,
   & h2 {
     color: var(--tc-surface-high);
-    margin: var(--sp-extra-loose) 0 var(--sp-normal);
+    margin: var(--sp-loose) 0 var(--sp-normal);
     line-height: var(--lh-h1);
   }
   & h3,
   & h4 {
     color: var(--tc-surface-high);
-    margin: var(--sp-loose) 0 var(--sp-tight);
+    margin: var(--sp-normal) 0 var(--sp-tight);
     line-height: var(--lh-h2);
   }
   & h5,
   & h6 {
     color: var(--tc-surface-high);
-    margin: var(--sp-normal) 0 var(--sp-extra-tight);
+    margin: var(--sp-tight) 0 var(--sp-extra-tight);
     line-height: var(--lh-s1);
   }
   & hr {
-    border-color: var(--bg-surface-border);
+    border-color: var(--bg-divider);
   }
 
   .text img {
@@ -336,10 +393,20 @@
     @include scrollbar.scroll__h;
     @include scrollbar.scroll--auto-hide;
   }
-  & pre code {
-    color: var(--tc-surface-normal) !important;
+  & pre {
+    display: inline-block;
+    max-width: 100%;
+    @include scrollbar.scroll;
+    @include scrollbar.scroll__h;
+    @include scrollbar.scroll--auto-hide;
+    & code {
+      color: var(--tc-surface-normal) !important;
+      white-space: pre;
+    }
   }
   & blockquote {
+    display: inline-block;
+    max-width: 100%;
     padding-left: var(--sp-extra-tight);
     border-left: 4px solid var(--bg-surface-active);
     white-space: initial !important;
@@ -381,15 +448,22 @@
     list-style: none;
   }
   & table {
+    display: inline-block;
+    max-width: 100%;
+    white-space: normal !important;
     background-color: var(--bg-surface-hover);
     border-radius: calc(var(--bo-radius) / 2);
     border-spacing: 0;
     border: 1px solid var(--bg-surface-border);
+    @include scrollbar.scroll;
+    @include scrollbar.scroll__h;
+    @include scrollbar.scroll--auto-hide;
 
     & td, & th {
       padding: var(--sp-extra-tight);
       border: 1px solid var(--bg-surface-border);
       border-width: 0 1px 1px 0;
+      white-space: pre;
       &:last-child {
         border-width: 0;
         border-bottom-width: 1px;
@@ -412,7 +486,7 @@
 }
 
 .message.message--type-emote {
-  .message__content {
+  .message__body {
     font-style: italic;
 
     // Remove blockness of first `<p>` so that markdown emotes stay on one line.

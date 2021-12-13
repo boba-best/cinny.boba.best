@@ -61,7 +61,6 @@ function PeopleDrawer({ roomId }) {
   const PER_PAGE_MEMBER = 50;
   const mx = initMatrix.matrixClient;
   const room = mx.getRoom(roomId);
-  let isRoomChanged = false;
 
   const [itemCount, setItemCount] = useState(PER_PAGE_MEMBER);
   const [membership, setMembership] = useState('join');
@@ -104,9 +103,9 @@ function PeopleDrawer({ roomId }) {
 
   useEffect(() => {
     let isGettingMembers = true;
+    let isRoomChanged = false;
     const updateMemberList = (event) => {
       if (isGettingMembers) return;
-      console.log(event?.event?.room_id);
       if (event && event?.event?.room_id !== roomId) return;
       setMemberList(
         simplyfiMembers(

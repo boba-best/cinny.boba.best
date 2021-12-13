@@ -1,6 +1,17 @@
 import EventEmitter from 'events';
 import cons from './cons';
 
+function isNotifEvent(mEvent) {
+  const eType = mEvent.getType();
+  if (!cons.supportEventTypes.includes(eType)) return false;
+  if (eType === 'm.room.member') return false;
+
+  if (mEvent.isRedacted()) return false;
+  if (mEvent.getRelation()?.rel_type === 'm.replace') return false;
+
+  return true;
+}
+
 class Notifications extends EventEmitter {
   constructor(roomList) {
     super();
@@ -33,23 +44,16 @@ class Notifications extends EventEmitter {
   doesRoomHaveUnread(room) {
     const userId = this.matrixClient.getUserId();
     const readUpToId = room.getEventReadUpTo(userId);
-    const supportEvents = ['m.room.message', 'm.room.encrypted', 'm.sticker'];
+    const liveEvents = room.getLiveTimeline().getEvents();
 
-    if (room.timeline.length
-      && room.timeline[room.timeline.length - 1].sender
-      && room.timeline[room.timeline.length - 1].sender.userId === userId
-      && room.timeline[room.timeline.length - 1].getType() !== 'm.room.member') {
+    if (liveEvents[liveEvents.length - 1]?.getSender() === userId) {
       return false;
     }
 
-    for (let i = room.timeline.length - 1; i >= 0; i -= 1) {
-      const event = room.timeline[i];
-
+    for (let i = liveEvents.length - 1; i >= 0; i -= 1) {
+      const event = liveEvents[i];
       if (event.getId() === readUpToId) return false;
-
-      if (supportEvents.includes(event.getType())) {
-        return true;
-      }
+      if (isNotifEvent(event)) return true;
     }
     return true;
   }
@@ -75,6 +79,13 @@ class Notifications extends EventEmitter {
 
   hasNoti(roomId) {
     return this.roomIdToNoti.has(roomId);
+  }
+
+  deleteNoti(roomId) {
+    if (this.hasNoti(roomId)) {
+      const noti = this.getNoti(roomId);
+      this._deleteNoti(roomId, noti.total, noti.highlight);
+    }
   }
 
   _getAllParentIds(roomId) {
@@ -149,10 +160,10 @@ class Notifications extends EventEmitter {
 
   _listenEvents() {
     this.matrixClient.on('Room.timeline', (mEvent, room) => {
-      const supportEvents = ['m.room.message', 'm.room.encrypted', 'm.sticker'];
-      if (!supportEvents.includes(mEvent.getType())) return;
+      if (!isNotifEvent(mEvent)) return;
+      const liveEvents = room.getLiveTimeline().getEvents();
 
-      const lastTimelineEvent = room.timeline[room.timeline.length - 1];
+      const lastTimelineEvent = liveEvents[liveEvents.length - 1];
       if (lastTimelineEvent.getId() !== mEvent.getId()) return;
       if (mEvent.getSender() === this.matrixClient.getUserId()) return;
 
@@ -170,17 +181,13 @@ class Notifications extends EventEmitter {
         const readerUserId = Object.keys(content[readedEventId]['m.read'])[0];
         if (readerUserId !== this.matrixClient.getUserId()) return;
 
-        if (this.hasNoti(room.roomId)) {
-          const noti = this.getNoti(room.roomId);
-          this._deleteNoti(room.roomId, noti.total, noti.highlight);
-        }
+        this.deleteNoti(room.roomId);
       }
     });
 
     this.matrixClient.on('Room.myMembership', (room, membership) => {
       if (membership === 'leave' && this.hasNoti(room.roomId)) {
-        const noti = this.getNoti(room.roomId);
-        this._deleteNoti(room.roomId, noti.total, noti.highlight);
+        this.deleteNoti(room.roomId);
       }
     });
   }

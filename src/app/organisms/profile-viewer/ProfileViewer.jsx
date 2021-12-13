@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import './ProfileViewer.scss';
 
+import { twemojify } from '../../../util/twemojify';
+
 import initMatrix from '../../../client/initMatrix';
 import cons from '../../../client/state/cons';
 import navigation from '../../../client/state/navigation';
@@ -93,10 +95,23 @@ function ProfileFooter({ roomId, userId, onRequestClose }) {
   const [isInvited, setIsInvited] = useState(member?.membership === 'invite');
 
   const myPowerlevel = room.getMember(mx.getUserId()).powerLevel;
-  const canIKick = room.currentState.hasSufficientPowerLevelFor('kick', myPowerlevel);
+  const userPL = room.getMember(userId)?.powerLevel || 0;
+  const canIKick = room.currentState.hasSufficientPowerLevelFor('kick', myPowerlevel) && userPL < myPowerlevel;
 
-  useEffect(() => () => {
-    isMountedRef.current = false;
+  const onCreated = (dmRoomId) => {
+    if (isMountedRef.current === false) return;
+    setIsCreatingDM(false);
+    selectRoom(dmRoomId);
+    onRequestClose();
+  };
+
+  useEffect(() => {
+    const { roomList } = initMatrix;
+    roomList.on(cons.events.roomList.ROOM_CREATED, onCreated);
+    return () => {
+      isMountedRef.current = false;
+      roomList.removeListener(cons.events.roomList.ROOM_CREATED, onCreated);
+    };
   }, []);
   useEffect(() => {
     setIsUserIgnored(initMatrix.matrixClient.isUserIgnored(userId));
@@ -111,7 +126,7 @@ function ProfileFooter({ roomId, userId, onRequestClose }) {
     for (let i = 0; i < directIds.length; i += 1) {
       const dRoom = mx.getRoom(directIds[i]);
       const roomMembers = dRoom.getMembers();
-      if (roomMembers.length <= 2 && dRoom.currentState.members[userId]) {
+      if (roomMembers.length <= 2 && dRoom.getMember(userId)) {
         selectRoom(directIds[i]);
         onRequestClose();
         return;
@@ -121,17 +136,13 @@ function ProfileFooter({ roomId, userId, onRequestClose }) {
     // Create new DM
     try {
       setIsCreatingDM(true);
-      const result = await roomActions.create({
+      await roomActions.create({
         isEncrypted: true,
         isDirect: true,
         invite: [userId],
       });
-
-      if (isMountedRef.current === false) return;
-      setIsCreatingDM(false);
-      selectRoom(result.room_id);
-      onRequestClose();
     } catch {
+      if (isMountedRef.current === false) return;
       setIsCreatingDM(false);
     }
   }
@@ -262,8 +273,8 @@ function ProfileViewer() {
             size="large"
           />
           <div className="profile-viewer__user__info">
-            <Text variant="s1">{username}</Text>
-            <Text variant="b2">{userId}</Text>
+            <Text variant="s1">{twemojify(username)}</Text>
+            <Text variant="b2">{twemojify(userId)}</Text>
           </div>
           <div className="profile-viewer__user__role">
             <Text variant="b3">Role</Text>
