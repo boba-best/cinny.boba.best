@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap');
+@import url(./font-face.css);
 
 :root {
 
@@ -43,7 +43,7 @@
   --tc-surface-high: #000000;
   --tc-surface-normal: rgba(0, 0, 0, 78%);
   --tc-surface-normal-low: rgba(0, 0, 0, 60%);
-  --tc-surface-low: rgba(0, 0, 0, 38%);
+  --tc-surface-low: rgba(0, 0, 0, 48%);
   
   --tc-primary-high: #ffffff;
   --tc-primary-normal: rgba(255, 255, 255, 68%);
@@ -69,11 +69,21 @@
 
   /* system icons | --ic-[background type]-[priority]: value */
   --ic-surface-normal: #626262;
+  --ic-surface-low: #7c7c7c;
   --ic-primary-normal: #ffffff;
   --ic-positive-normal: rgba(69, 184, 59, 80%);
   --ic-caution-normal: rgba(255, 179, 0, 80%);
   --ic-danger-normal: rgba(240, 71, 71, 0.7);
 
+  /* user mxid colors */
+  --mx-uc-1: hsl(208, 66%, 53%);
+  --mx-uc-2: hsl(302, 49%, 45%);
+  --mx-uc-3: hsl(163, 97%, 36%);
+  --mx-uc-4: hsl(343, 75%, 61%);
+  --mx-uc-5: hsl(24, 100%, 59%);
+  --mx-uc-6: hsl(181, 63%, 47%);
+  --mx-uc-7: hsl(242, 89%, 65%);
+  --mx-uc-8: hsl(94, 65%, 50%);
 
   /* system icon size | -ic-[size]: value */
   --ic-large: 38px;
@@ -113,7 +123,7 @@
   --bo-radius: 8px;
 
 
-  /* font syles */
+  /* font styles: font-size, letter-spacing, line-hight */
   --fs-h1: 36px;
   --ls-h1: -1.5px;
   --lh-h1: 38px;
@@ -137,6 +147,12 @@
   --fs-b3: 12px;
   --ls-b3: 0px;
   --lh-b3: 16px;
+
+  /* font-weight */
+  --fw-light: 300;
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-bold: 600;
 
 
   /* spacing | --sp-[space]: value */
@@ -162,7 +178,8 @@
   /* transition curves */
   --fluid-push: cubic-bezier(0, 0.8, 0.67, 0.97);
   
-  --font-family: 'Roboto', 'Supreme', sans-serif;
+  --font-primary: 'Roboto', sans-serif;
+  --font-secondary: 'Roboto', sans-serif;
 }
 
 .silver-theme {
@@ -216,7 +233,20 @@
 
   /* system icons | --ic-[background type]-[priority]: value */
   --ic-surface-normal: rgba(255, 255, 255, 84%);
+  --ic-surface-low: rgba(255, 255, 255, 64%);
   --ic-primary-normal: #ffffff;
+
+  & .text {
+    /* override user mxid colors for texts */
+    --mx-uc-1: hsl(208, 100%, 58%);
+    --mx-uc-2: hsl(301, 80%, 70%);
+    --mx-uc-3: hsl(163, 93%, 41%);
+    --mx-uc-4: hsl(343, 91%, 66%);
+    --mx-uc-5: hsl(24, 90%, 67%);
+    --mx-uc-6: hsl(181, 90%, 50%);
+    --mx-uc-7: hsl(243, 100%, 74%);
+    --mx-uc-8: hsl(94, 66%, 50%);
+  }
   
   /* shadow and overlay */
   --bg-overlay: rgba(0, 0, 0, 50%);
@@ -228,8 +258,25 @@
 
   --bs-primary-border: inset 0 0 0 1px var(--bg-primary-border);
   --bs-primary-outline: 0 0 0 2px var(--bg-primary-border);
+  
+  /* font styles: font-size, letter-spacing, line-hight */
+  --fs-h1: 35.6px;
 
-  --font-family: 'Supreme', 'Roboto', sans-serif;
+  --fs-h2: 23.6px;
+
+  --fs-s1: 17.6px;
+
+  --fs-b1: 14.6px;
+  --ls-b1: 0.14px;
+
+  --fs-b2: 13.2px;
+
+  --fs-b3: 11.2px;
+
+  /* override normal font weight for dark mode */
+  --fw-normal: 380;
+
+  --font-secondary: 'Inter', 'Roboto', sans-serif;
 }
 
 .butter-theme {
@@ -253,6 +300,41 @@
 
   /* system icons | --ic-[background type]-[priority]: value */
   --ic-surface-normal: rgb(255, 251, 222, 84%);
+  --ic-surface-low: rgba(255, 251, 222, 64%);
+}
+
+.font-primary {
+  font-family: var(--font-primary);
+
+  /* override font styles for primary font */
+  --fs-h1: 36px;
+  --ls-h1: -1.5px;
+  --lh-h1: 38px;
+
+  --fs-h2: 24px;
+  --ls-h2: -0.5px;
+  --lh-h2: 30px;
+
+  --fs-s1: 18px;
+  --ls-s1: -0.2px;
+  --lh-s1: 24px;
+
+  --fs-b1: 16px;
+  --ls-b1: 0.1px;
+  --lh-b1: 24px;
+
+  --fs-b2: 14px;
+  --ls-b2: 0.2px;
+  --lh-b2: 20px;
+
+  --fs-b3: 12px;
+  --ls-b3: 0px;
+  --lh-b3: 16px;
+
+  --fw-light: 300;
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-bold: 600;
 }
 
 html {
@@ -264,8 +346,9 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
-  font-family: var(--font-family);
+  font-family: var(--font-secondary);
   font-size: 16px;
+  font-weight: var(--fw-normal);
   background-color: var(--bg-surface-low);
 }
 #root {
@@ -283,7 +366,7 @@ a {
   text-decoration: none;
 }
 b {
-  font-weight: 500;
+  font-weight: var(--fw-medium);
 }
 label {
   margin: 0;
@@ -359,45 +442,8 @@ textarea {
                                   supported by Chrome, Edge, Opera and Firefox */
 }
 
-.flex {
+.flex--center {
   display: flex;
-}
-.flex-v {
-  display: flex;
-  flex-direction: column;
-}
-
-.flex--center,
-.flex--spaceBetween-center,
-.flex--end-center {
-  @extend .flex;
   justify-content: center;
   align-items: center;
-}
-.flex--spaceBetween,
-.flex--spaceBetween-center {
-  @extend .flex;
-  justify-content: space-between;
-}
-.flex--end,
-.flex--end-center {
-  @extend .flex;
-  justify-content: flex-end;
-}
-.inline-flex--center {
-  @extend .flex--center;
-  display: inline-flex
-}
-.flex--center-baseline {
-  @extend .flex--center;
-  align-items: baseline;
-}
-
-.flex-v--center {
-  @extend .flex-v;
-  justify-content: center;
-}
-.flex-v--end {
-  @extend .flex-v;
-  justify-content: flex-end;
 }

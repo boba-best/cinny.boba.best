@@ -3,7 +3,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
 import './Message.scss';
 
-import dateFormat from 'dateformat';
 import { twemojify } from '../../../util/twemojify';
 
 import initMatrix from '../../../client/initMatrix';
@@ -69,10 +68,16 @@ const MessageHeader = React.memo(({
   userId, username, time,
 }) => (
   <div className="message__header">
-    <div style={{ color: colorMXID(userId) }} className="message__profile">
-      <Text variant="b1">{twemojify(username)}</Text>
-      <Text variant="b1">{twemojify(userId)}</Text>
-    </div>
+    <Text
+      style={{ color: colorMXID(userId) }}
+      className="message__profile"
+      variant="b1"
+      weight="medium"
+      span
+    >
+      <span>{twemojify(username)}</span>
+      <span>{twemojify(userId)}</span>
+    </Text>
     <div className="message__time">
       <Text variant="b3">{time}</Text>
     </div>
@@ -333,7 +338,7 @@ function MessageReactionGroup({ roomTimeline, mEvent }) {
     } else {
       reaction.users.push(senderId);
       reaction.count = reaction.users.length;
-      reaction.isActive = isActive;
+      if (isActive) reaction.isActive = isActive;
     }
 
     reactions[key] = reaction;
@@ -438,7 +443,7 @@ const MessageOptions = React.memo(({
             <MenuHeader>Options</MenuHeader>
             <MenuItem
               iconSrc={TickMarkIC}
-              onClick={() => openReadReceipts(roomId, roomTimeline.getEventReaders(eventId))}
+              onClick={() => openReadReceipts(roomId, roomTimeline.getEventReaders(mEvent))}
             >
               Read receipts
             </MenuItem>

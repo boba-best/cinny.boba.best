@@ -253,11 +253,10 @@ function ProfileViewer() {
     };
   }, []);
 
-  useEffect(() => {
-    if (isOpen) return;
+  const handleAfterClose = () => {
     setUserId(null);
     setRoomId(null);
-  }, [isOpen]);
+  };
 
   function renderProfile() {
     const member = room.getMember(userId) || mx.getUser(userId) || {};
@@ -273,7 +272,7 @@ function ProfileViewer() {
             size="large"
           />
           <div className="profile-viewer__user__info">
-            <Text variant="s1">{twemojify(username)}</Text>
+            <Text variant="s1" weight="medium">{twemojify(username)}</Text>
             <Text variant="b2">{twemojify(userId)}</Text>
           </div>
           <div className="profile-viewer__user__role">
@@ -298,10 +297,11 @@ function ProfileViewer() {
       className="profile-viewer__dialog"
       isOpen={isOpen}
       title={`${username} in ${room?.name ?? ''}`}
+      onAfterClose={handleAfterClose}
       onRequestClose={() => setIsOpen(false)}
       contentOptions={<IconButton src={CrossIC} onClick={() => setIsOpen(false)} tooltip="Close" />}
     >
-      {isOpen && renderProfile()}
+      {roomId ? renderProfile() : <div />}
     </Dialog>
   );
 }
