@@ -95,6 +95,9 @@
 .message__reactions {
   max-width: calc(100% - 88px);
   min-width: 0;
+  @media (max-width: 1124px) {
+    max-width: 100%;
+  }
 }
 
 
@@ -161,6 +164,10 @@
   & a {
     word-break: break-word;
   }
+  & > .text > a {
+    white-space: initial !important;
+  }
+  
   & span[data-mx-pill] {
     background-color: hsla(0, 0%, 64%, 0.15);
     padding: 0 2px;
@@ -195,6 +202,7 @@
       opacity: 0;
     }
   }
+
   .data-mx-spoiler--visible {
     background-color: var(--bg-surface-active) !important;
     color: inherit !important;
@@ -241,8 +249,8 @@
   cursor: pointer;
 
   & .react-emoji {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     margin: 2px;
   }
   &-count {
@@ -250,8 +258,8 @@
     color: var(--tc-surface-normal)
   }
   &-tooltip .react-emoji  {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     margin: 0 var(--sp-ultra-tight);
     margin-bottom: -2px;
   }
@@ -370,7 +378,6 @@
   & blockquote {
     display: inline-block;
     max-width: 100%;
-    @include dir.side(padding, var(--sp-extra-tight), 0);
     @include dir.side(border, 4px solid var(--bg-surface-active), 0);
     white-space: initial !important;
 
@@ -383,10 +390,6 @@
     margin: var(--sp-ultra-tight) 0;
     @include dir.side(padding, 24px, 0);
     white-space: initial !important;
-    
-    & > * {
-      white-space: pre-wrap;
-    }
   }
   & ul.contains-task-list {
     padding: 0;

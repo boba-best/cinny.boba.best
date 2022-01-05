@@ -68,6 +68,7 @@
 
 
   /* system icons | --ic-[background type]-[priority]: value */
+  --ic-surface-high: #272727;
   --ic-surface-normal: #626262;
   --ic-surface-low: #7c7c7c;
   --ic-primary-normal: #ffffff;
@@ -172,15 +173,24 @@
   --navigation-drawer-width: calc(280px + var(--border-width));
   --navigation-width: calc(var(--navigation-sidebar-width) + var(--navigation-drawer-width));
   --people-drawer-width: calc(268px - var(--border-width));
-  // large size nav drawer & people drawer width => 326px, 312px
-  // medium size nav drawer & people drawer width => 280, 268
+
+  --popup-window-drawer-width: 280px;
+  
+  @media (max-width: 1124px) {
+    --navigation-drawer-width: calc(240px + var(--border-width));
+    --people-drawer-width: calc(256px - var(--border-width));
+    --popup-window-drawer-width: 240px;
+  }
 
   /* transition curves */
   --fluid-push: cubic-bezier(0, 0.8, 0.67, 0.97);
+  --fluid-slide-down: cubic-bezier(0.02, 0.82, 0.4, 0.96);
+  --fluid-slide-up: cubic-bezier(0.13, 0.56, 0.25, 0.99);
   
   --font-primary: 'Roboto', sans-serif;
   --font-secondary: 'Roboto', sans-serif;
 }
+
 
 .silver-theme {
   /* background color | --bg-[background type]: value */
@@ -192,8 +202,7 @@
   --bg-surface-extra-low-transparent: hsla(0, 0%, 91%, 0);
 }
 
-.dark-theme,
-.butter-theme {
+@mixin dark-mode() {
   /* background color | --bg-[background type]: value */
   --bg-surface: hsl(208, 8%, 20%);
   --bg-surface-transparent: hsla(208, 8%, 20%, 0);
@@ -218,6 +227,7 @@
 
 
   /* text color | --tc-[background type]-[priority]: value */
+  --ic-surface-high: rgb(255, 255, 255);;
   --tc-surface-high: rgba(255, 255, 255, 98%);
   --tc-surface-normal: rgba(255, 255, 255, 94%);
   --tc-surface-normal-low: rgba(255, 255, 255, 60%);
@@ -279,6 +289,17 @@
   --font-secondary: 'Inter', 'Roboto', sans-serif;
 }
 
+.dark-theme,
+.butter-theme {
+  @include dark-mode();
+}
+
+@media (prefers-color-scheme: dark) {
+  .system-theme {
+    @include dark-mode();
+  }
+}
+
 .butter-theme {
   /* background color | --bg-[background type]: value */
   --bg-surface: hsl(64, 6%, 14%);
@@ -299,7 +320,8 @@
 
 
   /* system icons | --ic-[background type]-[priority]: value */
-  --ic-surface-normal: rgb(255, 251, 222, 84%);
+  --ic-surface-high: rgb(255, 251, 222);
+  --ic-surface-normal: rgba(255, 251, 222, 84%);
   --ic-surface-low: rgba(255, 251, 222, 64%);
 }
 
@@ -350,6 +372,9 @@ body {
   font-size: 16px;
   font-weight: var(--fw-normal);
   background-color: var(--bg-surface-low);
+
+  /*Why font-variant-ligatures => https://github.com/rsms/inter/issues/222 */
+  font-variant-ligatures: no-contextual;
 }
 #root {
   width: 100%;
@@ -406,9 +431,9 @@ input[type=checkbox] {
 input[type=checkbox] {
   margin: 0;
   padding: 0;
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: calc(var(--bo-radius) / 2);
   box-shadow: var(--bs-primary-border);
   background-color: var(--bg-surface);
   cursor: pointer;

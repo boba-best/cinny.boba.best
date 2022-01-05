@@ -2,6 +2,7 @@ import EventEmitter from 'events';
 import { micromark } from 'micromark';
 import { gfm, gfmHtml } from 'micromark-extension-gfm';
 import encrypt from 'browser-encrypt-attachment';
+import { getShortcodeToEmoji } from '../../app/organisms/emoji-board/custom-emoji';
 import cons from './cons';
 import settings from './settings';
 
@@ -112,6 +113,54 @@ function bindReplyToContent(roomId, reply, content) {
   return newContent;
 }
 
+// Apply formatting to a plain text message
+//
+// This includes inserting any custom emoji that might be relevant, and (only if the
+// user has enabled it in their settings) formatting the message using markdown.
+function formatAndEmojifyText(room, text) {
+  const allEmoji = getShortcodeToEmoji(room);
+
+  // Start by applying markdown formatting (if relevant)
+  let formattedText;
+  if (settings.isMarkdown) {
+    formattedText = getFormattedBody(text);
+  } else {
+    formattedText = text;
+  }
+
+  // Check to see if there are any :shortcode-style-tags: in the message
+  Array.from(formattedText.matchAll(/\B:([\w-]+):\B/g))
+    // Then filter to only the ones corresponding to a valid emoji
+    .filter((match) => allEmoji.has(match[1]))
+    // Reversing the array ensures that indices are preserved as we start replacing
+    .reverse()
+    // Replace each :shortcode: with an <img/> tag
+    .forEach((shortcodeMatch) => {
+      const emoji = allEmoji.get(shortcodeMatch[1]);
+
+      // Render the tag that will replace the shortcode
+      let tag;
+      if (emoji.mxc) {
+        tag = `<img data-mx-emoticon="" src="${
+          emoji.mxc
+        }" alt=":${
+          emoji.shortcode
+        }:" title=":${
+          emoji.shortcode
+        }:" height="32" />`;
+      } else {
+        tag = emoji.unicode;
+      }
+
+      // Splice the tag into the text
+      formattedText = formattedText.substr(0, shortcodeMatch.index)
+        + tag
+        + formattedText.substr(shortcodeMatch.index + shortcodeMatch[0].length);
+    });
+
+  return formattedText;
+}
+
 class RoomsInput extends EventEmitter {
   constructor(mx) {
     super();
@@ -214,13 +263,18 @@ class RoomsInput extends EventEmitter {
         body: input.message,
         msgtype: 'm.text',
       };
-      if (settings.isMarkdown) {
-        const formattedBody = getFormattedBody(input.message);
-        if (formattedBody !== input.message) {
-          content.format = 'org.matrix.custom.html';
-          content.formatted_body = formattedBody;
-        }
+
+      // Apply formatting if relevant
+      const formattedBody = formatAndEmojifyText(
+        this.matrixClient.getRoom(roomId),
+        input.message,
+      );
+      if (formattedBody !== input.message) {
+        // Formatting was applied, and we need to switch to custom HTML
+        content.format = 'org.matrix.custom.html';
+        content.formatted_body = formattedBody;
       }
+
       if (typeof input.replyTo !== 'undefined') {
         content = bindReplyToContent(roomId, input.replyTo, content);
       }
@@ -348,14 +402,17 @@ class RoomsInput extends EventEmitter {
         rel_type: 'm.replace',
       },
     };
-    if (settings.isMarkdown) {
-      const formattedBody = getFormattedBody(editedBody);
-      if (formattedBody !== editedBody) {
-        content.formatted_body = ` * ${formattedBody}`;
-        content.format = 'org.matrix.custom.html';
-        content['m.new_content'].formatted_body = formattedBody;
-        content['m.new_content'].format = 'org.matrix.custom.html';
-      }
+
+    // Apply formatting if relevant
+    const formattedBody = formatAndEmojifyText(
+      this.matrixClient.getRoom(roomId),
+      editedBody
+    );
+    if (formattedBody !== editedBody) {
+      content.formatted_body = ` * ${formattedBody}`;
+      content.format = 'org.matrix.custom.html';
+      content['m.new_content'].formatted_body = formattedBody;
+      content['m.new_content'].format = 'org.matrix.custom.html';
     }
     if (isReply) {
       const evBody = mEvent.getContent().body;

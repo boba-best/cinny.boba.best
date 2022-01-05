@@ -11,12 +11,13 @@ function listenKeyboard(event) {
       openSearch();
     }
   }
+
   if (!event.ctrlKey && !event.altKey) {
     if (navigation.isRawModalVisible) return;
     if (['text', 'textarea'].includes(document.activeElement.type)) {
       return;
     }
-    if (event.keyCode < 48
+    if ((event.keyCode !== 8 && event.keyCode < 48)
       || (event.keyCode >= 91 && event.keyCode <= 93)
       || (event.keyCode >= 112 && event.keyCode <= 183)) {
       return;
