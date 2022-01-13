@@ -87,14 +87,6 @@ export function openReadReceipts(roomId, userIds) {
   });
 }
 
-export function openRoomOptions(cords, roomId) {
-  appDispatcher.dispatch({
-    type: cons.actions.navigation.OPEN_ROOMOPTIONS,
-    cords,
-    roomId,
-  });
-}
-
 export function replyTo(userId, eventId, body) {
   appDispatcher.dispatch({
     type: cons.actions.navigation.CLICK_REPLY_TO,
@@ -108,5 +100,15 @@ export function openSearch(term) {
   appDispatcher.dispatch({
     type: cons.actions.navigation.OPEN_SEARCH,
     term,
+  });
+}
+
+export function openReusableContextMenu(placement, cords, render, afterClose) {
+  appDispatcher.dispatch({
+    type: cons.actions.navigation.OPEN_REUSABLE_CONTEXT_MENU,
+    placement,
+    cords,
+    render,
+    afterClose,
   });
 }
