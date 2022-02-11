@@ -70,7 +70,7 @@
     "sass": "^1.49.7",
     "sass-loader": "^11.0.1",
     "stream-browserify": "^3.0.0",
-    "style-loader": "^2.0.0",
+    "style-loader": "^3.3.1",
     "url": "^0.11.0",
     "util": "^0.12.4",
     "webpack": "^5.62.1",
