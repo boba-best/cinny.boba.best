@@ -1,0 +1,12 @@
+{
+  "defaultHomeserver": 0,
+  "homeserverList": [
+    "boba.best",
+    "converser.eu",
+    "envs.net",
+    "halogen.city",
+    "kde.org",
+    "matrix.org",
+    "mozilla.modular.im"
+  ]
+}
